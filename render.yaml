@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: honeybee-backend
+    runtime: node
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: CLIENT_URL
+        value: https://honey-bee-alpha.vercel.app
+      - key: DB_HOST
+        value: localhost
+      - key: DB_USER
+        value: root
+      - key: DB_PASSWORD
+        value: ""
+      - key: DB_NAME
+        value: honeybee
