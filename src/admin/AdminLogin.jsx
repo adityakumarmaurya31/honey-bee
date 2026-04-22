@@ -4,8 +4,8 @@ import { API_BASE } from './api.js';
 
 const AdminLogin = () => {
   const navigate = useNavigate();
-  const [email, setEmail] = useState('admin@honeybee.com');
-  const [password, setPassword] = useState('admin123');
+  const [email, setEmail] = useState('admin@test.com');
+  const [password, setPassword] = useState('Admin@123');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
