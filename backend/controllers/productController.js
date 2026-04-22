@@ -19,8 +19,12 @@ const getProducts = async (req, res) => {
     }));
     res.json(result);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Unable to load products' });
+    console.error('Product fetch error:', error.message);
+    // Return empty array if database not available (graceful fallback)
+    if (error.code === 'PROTOCOL_CONNECTION_LOST' || error.code === 'ECONNREFUSED') {
+      return res.json([]);
+    }
+    res.status(500).json({ message: 'Unable to load products', error: error.message });
   }
 };
 
