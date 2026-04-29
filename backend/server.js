@@ -87,10 +87,12 @@ async function initializeDatabase() {
     // Test basic connection first
     await pool.query('SELECT 1');
 
+    const dbName = process.env.DB_NAME || 'honeybee';
+    
     // Check if 'users' table exists
     const [tables] = await pool.query(
       `SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'users'`,
-      [process.env.DB_NAME || 'honeybee']
+      [dbName]
     );
 
     if (tables.length === 0) {
@@ -98,8 +100,13 @@ async function initializeDatabase() {
       const schemaPath = path.join(__dirname, 'schema.sql');
       if (fs.existsSync(schemaPath)) {
         const schemaSQL = fs.readFileSync(schemaPath, 'utf8');
+        
+        // Replace database name in schema with actual DB name
+        let updatedSchema = schemaSQL.replace(/CREATE DATABASE IF NOT EXISTS honeybee/i, `CREATE DATABASE IF NOT EXISTS ${dbName}`);
+        updatedSchema = updatedSchema.replace(/USE honeybee/i, `USE ${dbName}`);
+        
         // Split by semicolon and execute each statement
-        const statements = schemaSQL
+        const statements = updatedSchema
           .split(';')
           .map(s => s.trim())
           .filter(s => s.length > 0 && !s.startsWith('--') && !s.startsWith('/*'));
@@ -109,15 +116,17 @@ async function initializeDatabase() {
             await pool.query(stmt);
           } catch (e) {
             // Ignore "database already exists" and similar benign errors
-            if (!e.message.includes('already exists')) {
-              console.warn('Schema statement warning:', e.message);
+            if (!e.message.includes('already exists') && !e.message.includes('Duplicate')) {
+              console.warn('⚠️  Schema warning:', e.message);
             }
           }
         }
-        console.log('✅ Database schema initialized');
+        console.log('✅ Database schema initialized successfully');
       } else {
         console.warn('⚠️  schema.sql not found at', schemaPath);
       }
+    } else {
+      console.log('✅ Database tables already exist');
     }
 
     // Run migrations
@@ -127,6 +136,7 @@ async function initializeDatabase() {
 
     return true;
   } catch (error) {
+    console.error('Database initialization error:', error.message);
     return false;
   }
 }
