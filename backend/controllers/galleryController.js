@@ -11,7 +11,7 @@ const getGallery = async (req, res) => {
 
     const result = items.map((item) => ({
       ...item,
-      media_url: item.media_url.startsWith('/uploads') 
+      media_url: item.media_url && item.media_url.startsWith('/uploads') 
         ? `${req.protocol}://${req.get('host')}${item.media_url}`
         : item.media_url,
     }));
