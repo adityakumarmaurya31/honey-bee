@@ -35,8 +35,6 @@ const pool = mysql.createPool({
   queueLimit: 0,
   ssl: getSSLConfig(),
   connectTimeout: 15000, // 15 seconds
-  acquireTimeout: 15000,
-  timeout: 15000,
   enableKeepAlive: true,
   keepAliveInitialDelay: 10000,
 });
