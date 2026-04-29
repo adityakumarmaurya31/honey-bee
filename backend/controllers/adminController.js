@@ -40,25 +40,11 @@ const login = async (req, res) => {
   try {
     const { email, password } = req.body;
     console.log('[LOGIN] Attempt for email:', email);
+    console.log('[LOGIN] Request body:', { email, password: password ? 'provided' : 'missing' });
     
     if (!email || !password) {
       console.log('[LOGIN] Missing email or password');
       return res.status(400).json({ message: 'Email and password are required' });
-    }
-
-    // Temporary test account (for debugging - REMOVE THIS LATER)
-    if (email === 'test@admin.com' && password === 'TestAdmin@123') {
-      console.log('[LOGIN] Test account login - backend is working!');
-      const token = jwt.sign(
-        { id: 999, email: 'test@admin.com', role: 'admin' },
-        JWT_SECRET,
-        { expiresIn: '8h' }
-      );
-      return res.json({ 
-        token, 
-        user: { id: 999, name: 'Test Admin', email: 'test@admin.com' },
-        message: 'Using test account - backend is responding'
-      });
     }
 
     try {
@@ -70,6 +56,10 @@ const login = async (req, res) => {
       );
 
       console.log('[LOGIN] Query returned', rows.length, 'rows');
+      if (rows.length > 0) {
+        console.log('[LOGIN] Admin user found:', rows[0].email, 'with role:', rows[0].role);
+      }
+      
       const adminUser = rows[0];
       if (!adminUser) {
         console.log('[LOGIN] No admin user found');
@@ -77,8 +67,11 @@ const login = async (req, res) => {
       }
 
       console.log('[LOGIN] Admin user found, comparing password');
+      console.log('[LOGIN] Stored password hash (first 20 chars):', adminUser.password.substring(0, 20));
+      
+      // Use bcrypt for password comparison
       const isMatch = await bcrypt.compare(password, adminUser.password);
-      console.log('[LOGIN] Password match result:', isMatch);
+      console.log('[LOGIN] bcrypt.compare result:', isMatch);
       
       if (!isMatch) {
         console.log('[LOGIN] Password does not match');
@@ -92,11 +85,12 @@ const login = async (req, res) => {
         { expiresIn: '8h' }
       );
 
-      console.log('[LOGIN] Token generated successfully');
+      console.log('[LOGIN] Token generated successfully for:', adminUser.email);
       res.json({ token, user: { id: adminUser.id, name: adminUser.name, email: adminUser.email } });
     } catch (dbError) {
       // If database fails, reject login
       console.error('[LOGIN] Database error:', dbError.message);
+      console.error('[LOGIN] Database error stack:', dbError.stack);
       return res.status(401).json({ message: 'Invalid credentials' });
     }
   } catch (error) {
