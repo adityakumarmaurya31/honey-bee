@@ -26,6 +26,7 @@ function Navbar({ cartCount = 0 }) {
           Cart
           {cartCount > 0 && <span className="cart-count-badge">{cartCount}</span>}
         </NavLink>
+        <NavLink to="/admin/login" style={{ color: '#ff6b00', fontWeight: 'bold' }}>Admin</NavLink>
       </nav>
     </header>
   );
