@@ -81,7 +81,7 @@ app.use((err, _req, res, _next) => {
   res.status(500).json({ message: 'Internal server error' });
 });
 
-// Auto-run schema.sql if tables don't exist
+// Auto-run schema creation if tables don't exist
 async function initializeDatabase() {
   try {
     // Test basic connection first
@@ -96,47 +96,119 @@ async function initializeDatabase() {
     );
 
     if (tables.length === 0) {
-      console.log('⚠️  No tables found. Running schema.sql to initialize database...');
-      const schemaPath = path.join(__dirname, 'schema.sql');
-      if (fs.existsSync(schemaPath)) {
-        let schemaSQL = fs.readFileSync(schemaPath, 'utf8');
+      console.log('⚠️  No tables found. Creating database schema...');
+      
+      // Create tables with hardcoded SQL (more reliable than parsing)
+      const createTableStatements = [
+        `CREATE TABLE IF NOT EXISTS users (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          name VARCHAR(100) NOT NULL,
+          email VARCHAR(200) NOT NULL UNIQUE,
+          password VARCHAR(255) NOT NULL,
+          role ENUM('admin','user') NOT NULL DEFAULT 'user',
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )`,
         
-        // Remove CREATE DATABASE and USE statements (not allowed on Railway)
-        schemaSQL = schemaSQL.replace(/CREATE\s+DATABASE\s+IF\s+NOT\s+EXISTS\s+\w+\s*;?/gi, '');
-        schemaSQL = schemaSQL.replace(/USE\s+\w+\s*;?/gi, '');
+        `CREATE TABLE IF NOT EXISTS products (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          name VARCHAR(255) NOT NULL,
+          description TEXT NOT NULL,
+          price DECIMAL(10,2) NOT NULL,
+          discount DECIMAL(5,2) DEFAULT 0,
+          stock INT NOT NULL DEFAULT 0,
+          image VARCHAR(255),
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )`,
         
-        // Remove SQL comments
-        schemaSQL = schemaSQL.replace(/--.*?$/gm, '');  // Remove single-line comments
-        schemaSQL = schemaSQL.replace(/\/\*[\s\S]*?\*\//g, '');  // Remove multi-line comments
+        `CREATE TABLE IF NOT EXISTS coupons (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          code VARCHAR(50) NOT NULL UNIQUE,
+          discount_type ENUM('percentage', 'fixed') NOT NULL,
+          discount_value DECIMAL(10,2) NOT NULL,
+          max_discount DECIMAL(10,2) NULL,
+          min_amount DECIMAL(10,2) NULL,
+          description TEXT,
+          usage_limit INT NULL,
+          expiry_date DATETIME NULL,
+          is_active TINYINT DEFAULT 1,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        )`,
         
-        // Split by semicolon and clean up whitespace
-        const statements = schemaSQL
-          .split(';')
-          .map(s => s.trim())
-          .filter(s => s.length > 0);
+        `CREATE TABLE IF NOT EXISTS orders (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          order_number VARCHAR(50) UNIQUE NOT NULL,
+          customer_name VARCHAR(100) NOT NULL,
+          customer_email VARCHAR(100) NOT NULL,
+          customer_phone VARCHAR(20) NOT NULL,
+          delivery_address TEXT NOT NULL,
+          total_amount DECIMAL(10,2) NOT NULL,
+          discount_amount DECIMAL(10,2) DEFAULT 0,
+          payment_method ENUM('card', 'upi', 'cod') NOT NULL,
+          order_status ENUM('pending', 'confirmed', 'shipped', 'delivered', 'cancelled') DEFAULT 'pending',
+          tracking_number VARCHAR(100),
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        )`,
+        
+        `CREATE TABLE IF NOT EXISTS order_items (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          order_id INT NOT NULL,
+          product_id INT NOT NULL,
+          quantity INT NOT NULL,
+          price DECIMAL(10,2) NOT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (order_id) REFERENCES orders(id)
+        )`,
+        
+        `CREATE TABLE IF NOT EXISTS enquiries (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          name VARCHAR(100) NOT NULL,
+          email VARCHAR(100) NOT NULL,
+          phone VARCHAR(20),
+          message TEXT NOT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )`,
+        
+        `CREATE TABLE IF NOT EXISTS gallery (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          title VARCHAR(255) NOT NULL,
+          description TEXT,
+          image_url VARCHAR(255) NOT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )`,
+        
+        `CREATE TABLE IF NOT EXISTS coupon_usage (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          coupon_id INT NOT NULL,
+          order_id INT NOT NULL,
+          user_email VARCHAR(100),
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (coupon_id) REFERENCES coupons(id),
+          FOREIGN KEY (order_id) REFERENCES orders(id)
+        )`
+      ];
 
-        console.log(`📊 Found ${statements.length} SQL statements to execute`);
-        
-        let successCount = 0;
-        for (const stmt of statements) {
-          try {
-            await pool.query(stmt);
-            successCount++;
-            console.log(`✅ [${successCount}/${statements.length}] Executed: ${stmt.substring(0, 40).replace(/\n/g, ' ')}...`);
-          } catch (e) {
-            // Ignore "table already exists" and "duplicate key" errors  
-            if (e.message.includes('already exists') || e.message.includes('Duplicate')) {
-              console.log(`⏭️  Already exists: ${stmt.substring(0, 40).replace(/\n/g, ' ')}...`);
-            } else {
-              console.error('❌ Schema error:', e.message.substring(0, 100));
-              // Don't stop on error - continue with other statements
-            }
+      console.log(`📊 Creating ${createTableStatements.length} tables...`);
+      let successCount = 0;
+
+      for (const stmt of createTableStatements) {
+        try {
+          await pool.query(stmt);
+          successCount++;
+          const tableName = stmt.match(/CREATE TABLE IF NOT EXISTS (\w+)/i)?.[1] || 'unknown';
+          console.log(`✅ Created table: ${tableName}`);
+        } catch (e) {
+          if (e.message.includes('already exists')) {
+            const tableName = stmt.match(/CREATE TABLE IF NOT EXISTS (\w+)/i)?.[1] || 'unknown';
+            console.log(`⏭️  Table already exists: ${tableName}`);
+          } else {
+            console.error('❌ Table creation error:', e.message.substring(0, 80));
           }
         }
-        console.log(`✅ Database initialization complete (${successCount}/${statements.length} tables created)`);
-      } else {
-        console.warn('⚠️  schema.sql not found at', schemaPath);
       }
+      
+      console.log(`✅ Database schema initialized (${successCount}/${createTableStatements.length} tables)`);
     } else {
       console.log('✅ Database tables already exist');
     }
