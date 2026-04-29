@@ -101,17 +101,11 @@ async function initializeDatabase() {
       if (fs.existsSync(schemaPath)) {
         let schemaSQL = fs.readFileSync(schemaPath, 'utf8');
         
-        // Skip CREATE DATABASE and USE statements (Railway doesn't allow CREATE DATABASE)
-        // Just keep the table creation statements
-        schemaSQL = schemaSQL
-          .split('\n')
-          .filter(line => {
-            const trimmed = line.trim();
-            return !trimmed.startsWith('CREATE DATABASE') && 
-                   !trimmed.startsWith('USE ') &&
-                   trimmed.length > 0;
-          })
-          .join('\n');
+        // Remove CREATE DATABASE statement (Railway doesn't allow it)
+        schemaSQL = schemaSQL.replace(/CREATE\s+DATABASE\s+IF\s+NOT\s+EXISTS\s+\w+\s*;?/gi, '');
+        
+        // Remove USE statement (already connected to the correct database)
+        schemaSQL = schemaSQL.replace(/USE\s+\w+\s*;?/gi, '');
         
         // Split by semicolon and execute each statement
         const statements = schemaSQL
@@ -119,17 +113,22 @@ async function initializeDatabase() {
           .map(s => s.trim())
           .filter(s => s.length > 0 && !s.startsWith('--') && !s.startsWith('/*'));
 
+        console.log(`📊 Found ${statements.length} SQL statements to execute`);
+        
         for (const stmt of statements) {
           try {
             await pool.query(stmt);
+            console.log(`✅ Executed: ${stmt.substring(0, 50)}...`);
           } catch (e) {
-            // Ignore "table already exists" and "duplicate key" errors
-            if (!e.message.includes('already exists') && !e.message.includes('Duplicate')) {
-              console.warn('⚠️  Schema warning:', e.message);
+            // Ignore "table already exists" and "duplicate key" errors  
+            if (e.message.includes('already exists') || e.message.includes('Duplicate')) {
+              console.log(`⏭️  Skipped (already exists): ${stmt.substring(0, 40)}...`);
+            } else {
+              console.warn('⚠️  Schema error:', e.message.substring(0, 100));
             }
           }
         }
-        console.log('✅ Database schema initialized successfully');
+        console.log('✅ Database schema initialization complete');
       } else {
         console.warn('⚠️  schema.sql not found at', schemaPath);
       }
