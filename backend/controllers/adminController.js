@@ -39,41 +39,53 @@ const normalizeTrackingNumber = (value) => {
 const login = async (req, res) => {
   try {
     const { email, password } = req.body;
+    console.log('[LOGIN] Attempt for email:', email);
+    
     if (!email || !password) {
+      console.log('[LOGIN] Missing email or password');
       return res.status(400).json({ message: 'Email and password are required' });
     }
 
     try {
       // Only allow users with 'admin' role to login
+      console.log('[LOGIN] Querying for admin user with email:', email);
       const [rows] = await pool.query(
         'SELECT id, name, email, password, role FROM users WHERE email = ? AND role = ?',
         [email, 'admin']
       );
 
+      console.log('[LOGIN] Query returned', rows.length, 'rows');
       const adminUser = rows[0];
       if (!adminUser) {
+        console.log('[LOGIN] No admin user found');
         return res.status(401).json({ message: 'Invalid credentials' });
       }
 
+      console.log('[LOGIN] Admin user found, comparing password');
       const isMatch = await bcrypt.compare(password, adminUser.password);
+      console.log('[LOGIN] Password match result:', isMatch);
+      
       if (!isMatch) {
+        console.log('[LOGIN] Password does not match');
         return res.status(401).json({ message: 'Invalid credentials' });
       }
 
+      console.log('[LOGIN] Password matched, generating token');
       const token = jwt.sign(
         { id: adminUser.id, email: adminUser.email, role: adminUser.role },
         JWT_SECRET,
         { expiresIn: '8h' }
       );
 
+      console.log('[LOGIN] Token generated successfully');
       res.json({ token, user: { id: adminUser.id, name: adminUser.name, email: adminUser.email } });
     } catch (dbError) {
       // If database fails, reject login
-      console.warn('Database login failed:', dbError.message);
+      console.error('[LOGIN] Database error:', dbError.message);
       return res.status(401).json({ message: 'Invalid credentials' });
     }
   } catch (error) {
-    console.error(error);
+    console.error('[LOGIN] Unexpected error:', error);
     res.status(503).json({ message: getDatabaseErrorMessage(error) });
   }
 };
