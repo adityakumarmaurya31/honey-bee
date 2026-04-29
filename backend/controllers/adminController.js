@@ -43,24 +43,8 @@ const login = async (req, res) => {
       return res.status(400).json({ message: 'Email and password are required' });
     }
 
-    // Test admin account (fallback when database not available)
-    const TEST_ADMIN_EMAIL = 'admin@test.com';
-    const TEST_ADMIN_PASSWORD = 'Admin@123';
-    
-    if (email === TEST_ADMIN_EMAIL && password === TEST_ADMIN_PASSWORD) {
-      const token = jwt.sign(
-        { id: 1, email: TEST_ADMIN_EMAIL, role: 'admin' },
-        JWT_SECRET,
-        { expiresIn: '8h' }
-      );
-      return res.json({ 
-        token, 
-        user: { id: 1, name: 'Test Admin', email: TEST_ADMIN_EMAIL },
-        message: 'Using test credentials (database unavailable)'
-      });
-    }
-
     try {
+      // Only allow users with 'admin' role to login
       const [rows] = await pool.query(
         'SELECT id, name, email, password, role FROM users WHERE email = ? AND role = ?',
         [email, 'admin']
