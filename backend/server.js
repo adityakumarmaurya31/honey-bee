@@ -99,14 +99,22 @@ async function initializeDatabase() {
       console.log('⚠️  No tables found. Running schema.sql to initialize database...');
       const schemaPath = path.join(__dirname, 'schema.sql');
       if (fs.existsSync(schemaPath)) {
-        const schemaSQL = fs.readFileSync(schemaPath, 'utf8');
+        let schemaSQL = fs.readFileSync(schemaPath, 'utf8');
         
-        // Replace database name in schema with actual DB name
-        let updatedSchema = schemaSQL.replace(/CREATE DATABASE IF NOT EXISTS honeybee/i, `CREATE DATABASE IF NOT EXISTS ${dbName}`);
-        updatedSchema = updatedSchema.replace(/USE honeybee/i, `USE ${dbName}`);
+        // Skip CREATE DATABASE and USE statements (Railway doesn't allow CREATE DATABASE)
+        // Just keep the table creation statements
+        schemaSQL = schemaSQL
+          .split('\n')
+          .filter(line => {
+            const trimmed = line.trim();
+            return !trimmed.startsWith('CREATE DATABASE') && 
+                   !trimmed.startsWith('USE ') &&
+                   trimmed.length > 0;
+          })
+          .join('\n');
         
         // Split by semicolon and execute each statement
-        const statements = updatedSchema
+        const statements = schemaSQL
           .split(';')
           .map(s => s.trim())
           .filter(s => s.length > 0 && !s.startsWith('--') && !s.startsWith('/*'));
@@ -115,7 +123,7 @@ async function initializeDatabase() {
           try {
             await pool.query(stmt);
           } catch (e) {
-            // Ignore "database already exists" and similar benign errors
+            // Ignore "table already exists" and "duplicate key" errors
             if (!e.message.includes('already exists') && !e.message.includes('Duplicate')) {
               console.warn('⚠️  Schema warning:', e.message);
             }
