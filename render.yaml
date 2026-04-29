@@ -5,17 +5,40 @@ services:
     buildCommand: cd backend && npm install
     startCommand: cd backend && node server.js
     envVars:
+      # ✅ Server Configuration (already set - do not change)
       - key: NODE_ENV
         value: production
       - key: PORT
         value: 10000
       - key: CLIENT_URL
         value: https://honey-bee-alpha.vercel.app
-      - key: DB_HOST
-        value: localhost
-      - key: DB_USER
-        value: root
-      - key: DB_PASSWORD
-        value: ""
-      - key: DB_NAME
-        value: honeybee
+
+      # ⚠️  DATABASE CONFIGURATION
+      # YOU MUST SET THESE IN RENDER DASHBOARD!
+      # Read RENDER_DATABASE_SETUP.md for complete instructions
+      # 
+      # Go to: https://dashboard.render.com
+      # → Your Service → Settings → Environment
+      # → Click Add Environment Variable
+      # → Enter EXACTLY these keys with YOUR values:
+      #
+      # DB_HOST=<your_database_host_from_provider>
+      # DB_USER=<your_database_user>
+      # DB_PASSWORD=<your_database_password>
+      # DB_NAME=<your_database_name>
+      # DB_SSL=true
+      #
+      # Examples:
+      # - Railway: host = monorail.proxy.rlwy.net, user = root
+      # - PlanetScale: host = aws.connect.psdb.cloud
+      # - Aiven: host = your-db-xxx.aivencloud.com
+
+      # ⚠️  SECURITY & JWT (SET IN RENDER DASHBOARD)
+      # Generate random strings and set these:
+      # JWT_SECRET=<random_string_min_32_chars>
+      # CHECKOUT_TOKEN_SECRET=<random_string_min_32_chars>
+
+      # ⚠️  RAZORPAY PAYMENT INTEGRATION (SET IN RENDER DASHBOARD)
+      # Get these from https://dashboard.razorpay.com
+      # RAZORPAY_KEY_ID=<your_key_from_razorpay>
+      # RAZORPAY_KEY_SECRET=<your_secret_from_razorpay>

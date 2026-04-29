@@ -1,4 +1,4 @@
-export const API_BASE = import.meta.env.VITE_API_BASE || 'https://honeybee-tmr8.onrender.com';
+export const API_BASE = import.meta.env.VITE_API_BASE || window.location.origin;
 
 export const getAuthHeaders = () => {
   const token = localStorage.getItem('adminToken');

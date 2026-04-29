@@ -59,16 +59,22 @@ const normalizeItems = (items) => {
 };
 
 const validateCustomerFields = ({ name, email, phone, address, city, state, pincode }) => {
-  if (!name || !email || !phone || !address || !city || !state || !pincode) {
-    return false;
-  }
+  const errors = [];
+  
+  if (!name || name.toString().trim() === '') errors.push('Full Name');
+  if (!email || email.toString().trim() === '') errors.push('Email');
+  if (!phone || phone.toString().trim() === '') errors.push('Phone Number');
+  if (!address || address.toString().trim() === '') errors.push('Address');
+  if (!city || city.toString().trim() === '') errors.push('City');
+  if (!state || state.toString().trim() === '') errors.push('State');
+  if (!pincode || pincode.toString().trim() === '') errors.push('Pincode');
   
   // Validate phone: only digits, minimum 10 digits
-  if (!/^\d{10,}$/.test(phone.toString().trim())) {
-    return false;
+  if (phone && !/^\d{10,}$/.test(phone.toString().trim())) {
+    errors.push('Phone (must be 10+ digits)');
   }
   
-  return true;
+  return { isValid: errors.length === 0, errors };
 };
 
 const fetchProductsMap = async (productIds) => {
@@ -248,8 +254,9 @@ const createOrder = async (req, res) => {
   try {
     const { name, email, phone, address, city, state, pincode, paymentMethod, items, coupon_id, coupon_discount } = req.body;
 
-    if (!validateCustomerFields({ name, email, phone, address, city, state, pincode })) {
-      return res.status(400).json({ message: 'All order fields are required' });
+    const validation = validateCustomerFields({ name, email, phone, address, city, state, pincode });
+    if (!validation.isValid) {
+      return res.status(400).json({ message: `Missing required fields: ${validation.errors.join(', ')}` });
     }
 
     if (paymentMethod && paymentMethod !== 'COD') {
@@ -287,8 +294,9 @@ const createPaymentOrder = async (req, res) => {
   try {
     const { name, email, phone, address, city, state, pincode, items, coupon_id, coupon_discount } = req.body;
 
-    if (!validateCustomerFields({ name, email, phone, address, city, state, pincode })) {
-      return res.status(400).json({ message: 'All checkout fields are required' });
+    const validation = validateCustomerFields({ name, email, phone, address, city, state, pincode });
+    if (!validation.isValid) {
+      return res.status(400).json({ message: `Missing required fields: ${validation.errors.join(', ')}` });
     }
 
     const razorpay = getRazorpayInstance();
