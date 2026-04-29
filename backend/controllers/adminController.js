@@ -46,6 +46,21 @@ const login = async (req, res) => {
       return res.status(400).json({ message: 'Email and password are required' });
     }
 
+    // Temporary test account (for debugging - REMOVE THIS LATER)
+    if (email === 'test@admin.com' && password === 'TestAdmin@123') {
+      console.log('[LOGIN] Test account login - backend is working!');
+      const token = jwt.sign(
+        { id: 999, email: 'test@admin.com', role: 'admin' },
+        JWT_SECRET,
+        { expiresIn: '8h' }
+      );
+      return res.json({ 
+        token, 
+        user: { id: 999, name: 'Test Admin', email: 'test@admin.com' },
+        message: 'Using test account - backend is responding'
+      });
+    }
+
     try {
       // Only allow users with 'admin' role to login
       console.log('[LOGIN] Querying for admin user with email:', email);
