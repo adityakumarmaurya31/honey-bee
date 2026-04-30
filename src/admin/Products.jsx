@@ -160,7 +160,16 @@ const Products = () => {
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      setForm({ ...form, image: file });
+      if (!file.type.startsWith('image/')) {
+        setMessage('❌ Please select a valid image file');
+        e.target.value = '';
+        setForm((prev) => ({ ...prev, image: null }));
+        setImagePreview(null);
+        return;
+      }
+
+      setForm((prev) => ({ ...prev, image: file }));
+      setMessage('');
       // Create preview
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -255,9 +264,11 @@ const Products = () => {
             
             <div className="mb-3 border-2 border-dashed border-slate-300 rounded-lg p-4">
               <input
+                name="image"
                 type="file"
                 accept="image/*"
                 onChange={handleImageChange}
+                required={!editing}
                 className="w-full text-slate-700 cursor-pointer"
               />
               <p className="text-xs text-slate-600 mt-2">

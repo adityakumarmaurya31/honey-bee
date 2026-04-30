@@ -202,7 +202,8 @@ const createProduct = async (req, res) => {
   try {
     const { name, price, description, stock, discount } = req.body;
     
-    console.log('[createProduct] Request - File:', req.file?.filename);
+    console.log('[createProduct] Request - File:', req.file?.originalname || req.file?.filename);
+    console.log('[createProduct] Request - Files:', Array.isArray(req.files) ? req.files.map((file) => file.fieldname) : []);
     console.log('[createProduct] Body:', { name, price, description, stock, discount });
 
     // Validate all required fields
@@ -214,7 +215,10 @@ const createProduct = async (req, res) => {
     }
 
     if (!req.file) {
-      return res.status(400).json({ message: 'Image file is required' });
+      return res.status(400).json({
+        message: 'Image file is required. Please choose an image again and submit.',
+        receivedFileFields: Array.isArray(req.files) ? req.files.map((file) => file.fieldname) : [],
+      });
     }
 
     // Parse and validate numeric values

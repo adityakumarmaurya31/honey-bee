@@ -17,14 +17,26 @@ const upload = multer({
   },
 });
 
+const productImageUpload = (req, res, next) => {
+  upload.any()(req, res, (err) => {
+    if (err) return next(err);
+
+    if (!req.file && Array.isArray(req.files) && req.files.length > 0) {
+      req.file = req.files.find((file) => file.fieldname === 'image') || req.files[0];
+    }
+
+    next();
+  });
+};
+
 router.post('/login', adminController.login);
 
 router.use(adminAuth);
 
 router.get('/dashboard-stats', adminController.dashboardStats);
 router.get('/products', adminController.getProducts);
-router.post('/products', upload.single('image'), adminController.createProduct);
-router.put('/products/:id', upload.single('image'), adminController.updateProduct);
+router.post('/products', productImageUpload, adminController.createProduct);
+router.put('/products/:id', productImageUpload, adminController.updateProduct);
 router.delete('/products/:id', adminController.deleteProduct);
 
 router.get('/orders', adminController.getOrders);
