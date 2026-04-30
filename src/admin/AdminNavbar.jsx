@@ -19,37 +19,60 @@ const AdminNavbar = () => {
   };
 
   return (
-    <aside className="fixed inset-y-0 left-0 w-72 bg-white border-r border-slate-200 px-6 py-8 hidden lg:flex flex-col justify-between">
-      <div>
-        <div className="mb-10">
-          <div className="text-xl font-semibold text-slate-900">Honey Admin</div>
-          <p className="text-sm text-slate-500 mt-1">Manage products, orders, and users</p>
+    <>
+      <aside className="fixed inset-y-0 left-0 w-72 bg-white border-r border-slate-200 px-6 py-8 hidden lg:flex flex-col justify-between">
+        <div>
+          <div className="mb-10">
+            <div className="text-xl font-semibold text-slate-900">Honey Admin</div>
+            <p className="text-sm text-slate-500 mt-1">Manage products, orders, and users</p>
+          </div>
+
+          <nav className="space-y-2">
+            {links.map((link) => (
+              <NavLink
+                key={link.to}
+                to={link.to}
+                className={({ isActive }) =>
+                  `block rounded-2xl px-4 py-3 text-sm font-medium transition ${
+                    isActive ? 'bg-amber-100 text-amber-900 shadow-sm' : 'text-slate-700 hover:bg-slate-100'
+                  }`
+                }
+              >
+                {link.label}
+              </NavLink>
+            ))}
+          </nav>
         </div>
 
-        <nav className="space-y-2">
+        <button
+          onClick={logout}
+          className="w-full rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white hover:bg-slate-800"
+        >
+          Logout
+        </button>
+      </aside>
+
+      <div className="admin-mobile-nav lg:hidden">
+        <div className="admin-mobile-nav-scroll">
           {links.map((link) => (
             <NavLink
               key={link.to}
               to={link.to}
               className={({ isActive }) =>
-                `block rounded-2xl px-4 py-3 text-sm font-medium transition ${
-                  isActive ? 'bg-amber-100 text-amber-900 shadow-sm' : 'text-slate-700 hover:bg-slate-100'
+                `admin-mobile-nav-link ${
+                  isActive ? 'admin-mobile-nav-link-active' : ''
                 }`
               }
             >
               {link.label}
             </NavLink>
           ))}
-        </nav>
+          <button onClick={logout} className="admin-mobile-nav-link admin-mobile-logout">
+            Logout
+          </button>
+        </div>
       </div>
-
-      <button
-        onClick={logout}
-        className="w-full rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white hover:bg-slate-800"
-      >
-        Logout
-      </button>
-    </aside>
+    </>
   );
 };
 
