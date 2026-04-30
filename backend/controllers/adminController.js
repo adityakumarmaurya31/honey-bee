@@ -2,8 +2,62 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const pool = require('../db.js');
 const dotenv = require('dotenv');
+const fs = require('fs');
+const path = require('path');
+const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
 
 dotenv.config();
+
+// Configure S3 client if environment variables are present
+let s3Client = null;
+if (process.env.AWS_S3_BUCKET) {
+  s3Client = new S3Client({
+    region: process.env.AWS_S3_REGION || 'us-east-1',
+    credentials: process.env.AWS_ACCESS_KEY_ID ? {
+      accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
+    } : undefined
+  });
+}
+
+const uploadBufferToS3 = async (buffer, originalName, mimeType, folder = 'products') => {
+  if (!s3Client) throw new Error('S3 client not configured');
+  const sanitized = originalName.replace(/[^a-zA-Z0-9.-]/g, '_');
+  const key = `${folder}/${Date.now()}-${sanitized}`;
+  const params = {
+    Bucket: process.env.AWS_S3_BUCKET,
+    Key: key,
+    Body: buffer,
+    ContentType: mimeType,
+    ACL: 'public-read'
+  };
+  await s3Client.send(new PutObjectCommand(params));
+  const region = process.env.AWS_S3_REGION || 'us-east-1';
+  const bucket = process.env.AWS_S3_BUCKET;
+  return `https://${bucket}.s3.${region}.amazonaws.com/${key}`;
+};
+
+const saveUploadedImage = async (file, folder = 'products') => {
+  if (!file) {
+    return null;
+  }
+
+  if (process.env.AWS_S3_BUCKET) {
+    return uploadBufferToS3(file.buffer, file.originalname, file.mimetype, folder);
+  }
+
+  if (process.env.VERCEL) {
+    const error = new Error('Image upload storage is not configured. Use the Render backend URL or set AWS_S3_BUCKET for Vercel uploads.');
+    error.statusCode = 503;
+    throw error;
+  }
+
+  const uploadsDir = path.join(__dirname, '..', 'uploads');
+  if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+  const filename = `${Date.now()}-${file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+  fs.writeFileSync(path.join(uploadsDir, filename), file.buffer);
+  return `/uploads/${filename}`;
+};
 
 const JWT_SECRET = process.env.JWT_SECRET || 'honeybee_secret';
 
@@ -21,10 +75,20 @@ const getDatabaseErrorMessage = (error) => {
 
 const getProductImageUrl = (req, imagePath) => {
   if (!imagePath) return null;
-  if (imagePath.startsWith('/uploads')) {
-    return `${req.protocol}://${req.get('host')}${imagePath}`;
+  // Return just the path - frontend will handle URL construction
+  // This ensures the path is consistent whether called from different domains
+  if (imagePath.startsWith('http')) {
+    return imagePath;
   }
-  return imagePath;
+  if (imagePath.startsWith('/uploads')) {
+    return imagePath;
+  }
+  // If it starts with /, it's a public static path (like /hero-honey.jpg from public/ folder)
+  if (imagePath.startsWith('/')) {
+    return imagePath;
+  }
+  // Otherwise, treat as filename and add /uploads/ prefix (legacy support)
+  return `/uploads/${imagePath}`;
 };
 
 const normalizeTrackingNumber = (value) => {
@@ -137,59 +201,266 @@ const getProducts = async (req, res) => {
 const createProduct = async (req, res) => {
   try {
     const { name, price, description, stock, discount } = req.body;
-    if (!name || !price || !description || !stock) {
-      return res.status(400).json({ message: 'All product fields are required' });
+    
+    console.log('[createProduct] Request - File:', req.file?.filename);
+    console.log('[createProduct] Body:', { name, price, description, stock, discount });
+
+    // Validate all required fields
+    if (!name || name.toString().trim() === '' || !price || !description || description.toString().trim() === '' || !stock) {
+      return res.status(400).json({ 
+        message: 'Name, price, description, stock, and image are all required',
+        received: { name, price, description, stock, file: req.file?.filename }
+      });
     }
 
-    const discountValue = discount ? Math.min(Math.max(parseFloat(discount), 0), 100) : 0;
-    const imagePath = req.file ? `/uploads/${req.file.filename}` : null;
-    const [result] = await pool.query(
-      'INSERT INTO products (name, price, description, stock, discount, image) VALUES (?, ?, ?, ?, ?, ?)',
-      [name, price, description, stock, discountValue, imagePath]
-    );
+    if (!req.file) {
+      return res.status(400).json({ message: 'Image file is required' });
+    }
 
+    // Parse and validate numeric values
+    const parsedPrice = parseFloat(price);
+    const parsedStock = parseInt(stock, 10);
+    const parsedDiscount = discount !== undefined && discount !== '' && discount !== null ? parseFloat(discount) : 0;
+
+    console.log('[createProduct] Parsed values - Price:', parsedPrice, 'Stock:', parsedStock, 'Discount:', parsedDiscount);
+
+    if (isNaN(parsedPrice) || parsedPrice <= 0) {
+      return res.status(400).json({ message: 'Price must be a valid positive number' });
+    }
+
+    if (isNaN(parsedStock) || parsedStock < 0) {
+      return res.status(400).json({ message: 'Stock must be a valid non-negative number' });
+    }
+
+    if (isNaN(parsedDiscount) || parsedDiscount < 0 || parsedDiscount > 100) {
+      return res.status(400).json({ message: 'Discount must be between 0 and 100' });
+    }
+
+    let imagePath = null;
+    try {
+      imagePath = await saveUploadedImage(req.file, 'products');
+    } catch (e) {
+      console.error('[createProduct] Image upload failed:', e);
+      return res.status(e.statusCode || 500).json({ message: e.message || 'Failed to upload image' });
+    }
+    console.log('[createProduct] Image path:', imagePath);
+    
+    // Insert the product
+    const insertQuery = 'INSERT INTO products (name, price, description, stock, discount, image) VALUES (?, ?, ?, ?, ?, ?)';
+    const insertParams = [
+      name.toString().trim(),
+      parsedPrice,
+      description.toString().trim(),
+      parsedStock,
+      parsedDiscount,
+      imagePath
+    ];
+    
+    console.log('[createProduct] Executing insert with params:', { name: insertParams[0], price: insertParams[1], stock: insertParams[3] });
+    
+    const [result] = await pool.query(insertQuery, insertParams);
+
+    if (!result.insertId) {
+      console.error('[createProduct] Insert failed: No insertId returned');
+      return res.status(500).json({ message: 'Product creation failed: Unable to insert product' });
+    }
+
+    console.log('[createProduct] Insert successful - new ID:', result.insertId);
+
+    // Fetch the created product
     const [createdRows] = await pool.query('SELECT * FROM products WHERE id = ?', [result.insertId]);
-    res.status(201).json(createdRows[0]);
+    
+    if (!createdRows || createdRows.length === 0) {
+      console.error('[createProduct] Product not found after insertion, id:', result.insertId);
+      return res.status(500).json({ message: 'Product creation failed: Unable to retrieve created product' });
+    }
+
+    const product = createdRows[0];
+    console.log('[createProduct] Product from DB - image:', product.image);
+    
+    if (product.image) {
+      product.image = getProductImageUrl(req, product.image);
+    }
+
+    console.log('[createProduct] Success - created product:', product.id, product.name, 'image:', product.image);
+    console.log('[createProduct] Full response:', JSON.stringify(product));
+    res.status(201).json(product);
+    
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Unable to create product' });
+    console.error('[createProduct] Caught error:', error.message);
+    console.error('[createProduct] Error code:', error.code);
+    console.error('[createProduct] Error stack:', error.stack);
+    
+    // Provide more helpful error messages
+    let errorMessage = 'Unable to create product';
+    if (error.code === 'ER_DUP_ENTRY') {
+      errorMessage = 'Product name already exists';
+    } else if (error.code === 'ER_BAD_FIELD_ERROR') {
+      errorMessage = 'Database schema mismatch - contact administrator';
+    }
+    
+    res.status(500).json({ 
+      message: errorMessage,
+      error: error.message,
+      code: error.code
+    });
   }
 };
 
 const updateProduct = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, price, description, stock, discount } = req.body;
-    const productQuery = 'SELECT * FROM products WHERE id = ?';
-    const [[existingProduct]] = await pool.query(productQuery, [id]);
+    let { name, price, description, stock, discount } = req.body;
+    
+    console.log('[updateProduct] Request - ID:', id, 'File:', req.file?.filename);
+    console.log('[updateProduct] Body keys:', Object.keys(req.body));
+    console.log('[updateProduct] Body:', { name, price, description, stock, discount });
 
-    if (!existingProduct) {
+    if (!id || isNaN(id)) {
+      return res.status(400).json({ message: 'Invalid product ID' });
+    }
+
+    // Trim strings to handle whitespace
+    if (typeof name === 'string') name = name.trim();
+    if (typeof description === 'string') description = description.trim();
+
+    // Validate that required fields are provided and not empty
+    if (!name || name === '' || !price || price === '' || !description || description === '' || !stock || stock === '') {
+      console.log('[updateProduct] Validation failed - missing fields');
+      return res.status(400).json({ 
+        message: 'Name, price, description, and stock are all required',
+        received: { name, price, description, stock }
+      });
+    }
+
+    // Check if product exists
+    const [existingProducts] = await pool.query('SELECT * FROM products WHERE id = ?', [id]);
+
+    if (!existingProducts || existingProducts.length === 0) {
       return res.status(404).json({ message: 'Product not found' });
     }
 
-    const discountValue = discount !== undefined ? Math.min(Math.max(parseFloat(discount), 0), 100) : (existingProduct.discount || 0);
-    const imagePath = req.file ? `/uploads/${req.file.filename}` : existingProduct.image;
-    await pool.query(
-      'UPDATE products SET name = ?, price = ?, description = ?, stock = ?, discount = ?, image = ? WHERE id = ?',
-      [name || existingProduct.name, price || existingProduct.price, description || existingProduct.description, stock || existingProduct.stock, discountValue, imagePath, id]
-    );
+    const existingProduct = existingProducts[0];
+    console.log('[updateProduct] Found existing product:', existingProduct.id, existingProduct.name);
+    
+    // Parse and validate numeric values
+    const parsedPrice = parseFloat(price);
+    const parsedStock = parseInt(stock, 10);
+    const parsedDiscount = discount !== undefined && discount !== '' && discount !== null ? parseFloat(discount) : 0;
+    
+    console.log('[updateProduct] Parsed values - Price:', parsedPrice, 'Stock:', parsedStock, 'Discount:', parsedDiscount);
+    
+    if (isNaN(parsedPrice) || parsedPrice <= 0) {
+      return res.status(400).json({ message: 'Price must be a valid positive number' });
+    }
+    
+    if (isNaN(parsedStock) || parsedStock < 0) {
+      return res.status(400).json({ message: 'Stock must be a valid non-negative number' });
+    }
+    
+    if (isNaN(parsedDiscount) || parsedDiscount < 0 || parsedDiscount > 100) {
+      return res.status(400).json({ message: 'Discount must be between 0 and 100' });
+    }
 
-    const [[updated]] = await pool.query('SELECT * FROM products WHERE id = ?', [id]);
-    res.json(updated);
+    let imagePath = existingProduct.image;
+    if (req.file) {
+      try {
+        imagePath = await saveUploadedImage(req.file, 'products');
+      } catch (e) {
+        console.error('[updateProduct] Image upload failed:', e);
+        return res.status(e.statusCode || 500).json({ message: e.message || 'Failed to upload image' });
+      }
+    }
+    console.log('[updateProduct] Image handling - new file:', !!req.file, 'path:', imagePath);
+    
+    // Update the product
+    const updateQuery = 'UPDATE products SET name = ?, price = ?, description = ?, stock = ?, discount = ?, image = ? WHERE id = ?';
+    const updateParams = [
+      name,
+      parsedPrice,
+      description,
+      parsedStock,
+      parsedDiscount,
+      imagePath,
+      id
+    ];
+    
+    console.log('[updateProduct] Executing update query with params:', updateParams);
+    
+    const [updateResult] = await pool.query(updateQuery, updateParams);
+    console.log('[updateProduct] Update result - affected rows:', updateResult.affectedRows);
+
+    if (updateResult.affectedRows === 0) {
+      console.error('[updateProduct] No rows affected by update');
+      return res.status(500).json({ message: 'Failed to update product' });
+    }
+
+    // Fetch updated product
+    const [updatedProducts] = await pool.query('SELECT * FROM products WHERE id = ?', [id]);
+    
+    if (!updatedProducts || updatedProducts.length === 0) {
+      console.error('[updateProduct] Product not found after update, id:', id);
+      return res.status(500).json({ message: 'Unable to retrieve updated product' });
+    }
+
+    const product = updatedProducts[0];
+    console.log('[updateProduct] Product from DB - id:', product.id, 'image:', product.image);
+    
+    if (product.image) {
+      product.image = getProductImageUrl(req, product.image);
+    }
+
+    console.log('[updateProduct] Success - updated product:', product.id, product.name, 'image:', product.image);
+    res.status(200).json(product);
+    
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Unable to update product' });
+    console.error('[updateProduct] Caught error:', error.message);
+    console.error('[updateProduct] Error code:', error.code);
+    console.error('[updateProduct] Error stack:', error.stack);
+    
+    // Provide more helpful error messages
+    let errorMessage = 'Unable to update product';
+    if (error.code === 'ER_DUP_ENTRY') {
+      errorMessage = 'Product name already exists';
+    } else if (error.code === 'ER_BAD_FIELD_ERROR') {
+      errorMessage = 'Database schema mismatch - contact administrator';
+    }
+    
+    res.status(500).json({ 
+      message: errorMessage, 
+      error: error.message,
+      code: error.code 
+    });
   }
 };
 
 const deleteProduct = async (req, res) => {
   try {
     const { id } = req.params;
-    await pool.query('DELETE FROM products WHERE id = ?', [id]);
-    res.json({ message: 'Product deleted' });
+    
+    if (!id || isNaN(id)) {
+      return res.status(400).json({ message: 'Invalid product ID' });
+    }
+
+    // Check if product exists first
+    const [existingProducts] = await pool.query('SELECT * FROM products WHERE id = ?', [id]);
+    
+    if (!existingProducts || existingProducts.length === 0) {
+      return res.status(404).json({ message: 'Product not found' });
+    }
+
+    // Delete the product
+    const [result] = await pool.query('DELETE FROM products WHERE id = ?', [id]);
+    
+    if (result.affectedRows === 0) {
+      return res.status(500).json({ message: 'Failed to delete product' });
+    }
+
+    res.json({ message: 'Product deleted successfully' });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Unable to delete product' });
+    console.error('[deleteProduct] Error:', error.message);
+    console.error('[deleteProduct] Error details:', error);
+    res.status(500).json({ message: 'Unable to delete product', error: error.message });
   }
 };
 

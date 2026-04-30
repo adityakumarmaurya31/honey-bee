@@ -1,14 +1,18 @@
-import { createServer } from 'node:http';
-import { createRequestListener } from 'http';
 import express from 'express';
 import cors from 'cors';
+import multer from 'multer';
 import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
 import mysql from 'mysql2/promise';
+import { fileURLToPath } from 'url';
 
 // Load env
 dotenv.config();
+
+// Get __dirname equivalent in ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // MySQL pool
 const pool = mysql.createPool({
@@ -26,7 +30,7 @@ const pool = mysql.createPool({
 // Test connection
 async function testConnection() {
   try {
-    const connection = await pool.getConnection();
+    const connection = await pool.getConnection()
     await connection.ping();
     connection.release();
     return { success: true };
@@ -57,10 +61,13 @@ app.use(cors({ origin: true }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Static uploads (Vercel public dir would be needed, fallback)
-app.use('/uploads', express.static(path.join(process.cwd(), 'backend/uploads')) || (req, res) => res.status(404).json({error: 'uploads not available'}));
+// Static uploads directory
+const uploadsDir = path.join(__dirname, '..', 'backend', 'uploads');
+if (fs.existsSync(uploadsDir)) {
+  app.use('/uploads', express.static(uploadsDir));
+}
 
-// Routes
+// Health check endpoint
 app.get('/', (_req, res) => res.send('Honeybee backend on Vercel'));
 
 app.get('/api/health', async (_req, res) => {
@@ -68,14 +75,83 @@ app.get('/api/health', async (_req, res) => {
   res.status(result.success ? 200 : 503).json(result);
 });
 
-// TODO: Add all backend routes here
-// For now, minimal health check
-// Full migration needs controllers/routes ported as modules
+// Import backend routes
+let adminRoutes, productRoutes, orderRoutes, enquiryRoutes, galleryRoutes, couponRoutes;
+
+try {
+  // Admin routes (includes authentication and product CRUD with file upload)
+  const adminModule = await import('../backend/routes/admin.js');
+  adminRoutes = adminModule.default;
+  
+  // Product routes (public read-only)
+  const productModule = await import('../backend/routes/products.js');
+  productRoutes = productModule.default;
+  
+  // Order routes
+  const orderModule = await import('../backend/routes/orderRoutes.js');
+  orderRoutes = orderModule.default;
+  
+  // Enquiry routes
+  const enquiryModule = await import('../backend/routes/enquiryRoutes.js');
+  enquiryRoutes = enquiryModule.default;
+  
+  // Gallery routes
+  const galleryModule = await import('../backend/routes/galleryRoutes.js');
+  galleryRoutes = galleryModule.default;
+  
+  // Coupon routes
+  const couponModule = await import('../backend/routes/couponRoutes.js');
+  couponRoutes = couponModule.default;
+  
+  console.log('✅ All backend routes imported successfully');
+} catch (err) {
+  console.error('❌ Failed to import backend routes:', err.message);
+}
+
+// Mount admin routes under /api/admin
+if (adminRoutes) {
+  app.use('/api/admin', adminRoutes);
+}
+
+// Mount product routes under /api/products
+if (productRoutes) {
+  app.use('/api/products', productRoutes);
+}
+
+// Mount order routes under /api/orders
+if (orderRoutes) {
+  app.use('/api/orders', orderRoutes);
+}
+
+// Mount enquiry routes under /api/enquiries
+if (enquiryRoutes) {
+  app.use('/api/enquiries', enquiryRoutes);
+}
+
+// Mount gallery routes under /api/gallery
+if (galleryRoutes) {
+  app.use('/api/gallery', galleryRoutes);
+}
+
+// Mount coupon routes under /api/coupons
+if (couponRoutes) {
+  app.use('/api/coupons', couponRoutes);
+}
 
 // Error handler
 app.use((err, _req, res, _next) => {
-  console.error(err);
-  res.status(500).json({ error: 'Internal server error' });
+  console.error('API Error:', err);
+  if (err instanceof multer.MulterError) {
+    const message = err.code === 'LIMIT_FILE_SIZE'
+      ? 'Image is too large. Please upload an image under 5 MB.'
+      : err.message;
+    return res.status(400).json({ message, code: err.code });
+  }
+
+  res.status(500).json({
+    message: err.message || 'Internal server error',
+    error: err.name || 'ServerError',
+  });
 });
 
 // Vercel export
@@ -94,4 +170,3 @@ export const config = {
     bodyParser: false,
   },
 };
-

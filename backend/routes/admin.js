@@ -8,18 +8,14 @@ const adminAuth = require('../middleware/adminAuth.js');
 
 const router = express.Router();
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, path.join(__dirname, '..', 'uploads'));
-  },
-  filename: (req, file, cb) => {
-    const timestamp = Date.now();
-    const sanitizedName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
-    cb(null, `${timestamp}-${sanitizedName}`);
+// Use memory storage so controllers can decide to persist locally or to S3
+const storage = multer.memoryStorage();
+const upload = multer({
+  storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024,
   },
 });
-
-const upload = multer({ storage });
 
 router.post('/login', adminController.login);
 

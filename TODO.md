@@ -1,44 +1,21 @@
-# Backend to Vercel Migration - Progress Tracker
+# TODO
 
-## Approved Plan Steps:
+## Fix Admin Product Image Update - Internal Server Error
 
-### ✅ Step 0: Create TODO.md (Done)
+### Issue
+Admin product image update not working - Internal server error
 
-### ✅ Step 1: Create api/index.js (Vercel handler)
-### ✅ Step 2: Update vercel.json
-### ✅ Step 3: Update src/admin/api.js
+### Root Cause
+The Vercel API (api/index.js) doesn't have the admin routes mounted - only has basic / and /api/health endpoints
 
-### ⬜ Step 4: npx vercel --prod
-```
-{
-  "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/index.js" },
-    { "source": "/(.*)", "destination": "/index.html" }
-  ]
-}
-```
+### Fix Plan
+1. [x] Identify the root cause - api/index.js missing admin routes
+2. [x] Fix api/index.js - add multer configuration
+3. [x] Fix api/index.js - mount admin routes
+4. [x] Fix api/index.js - mount product routes
+5. [x] Fix api/index.js - mount other backend routes
+6. [x] Update package.json - add backend dependencies
 
-### ⬜ Step 3: Update src/admin/api.js
-```
-VITE_API_BASE = window.location.origin
-```
-
-### ⬜ Step 4: npx vercel --prod
-- Set env vars during prompts:
-  - DB_HOST, DB_USER, DB_PASSWORD, DB_NAME, DB_SSL=true
-  - JWT_SECRET, CHECKOUT_TOKEN_SECRET
-  - RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET
-
-### ⬜ Step 5: Test endpoints
-- https://[vercel-url]/api/health → {"ok":true,"database":"connected"}
-
-### ⬜ Step 6: Open frontend page
-
-**Current status:** Deploying with npx vercel... Provide DB credentials when prompted. ✅ Steps 1-3 complete
-
-**Commands ready:**
-```bash
-cd "c:/Users/Aditya/OneDrive/Desktop/Backup p/honey bee"
-npx vercel
-```
-
+### Files Edited
+- api/index.js - Added multer and mounted all backend routes
+- package.json - Added backend dependencies (bcryptjs, express, multer, etc.)

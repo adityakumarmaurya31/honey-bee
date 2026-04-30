@@ -3,6 +3,7 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const path = require('path');
 const fs = require('fs');
+const multer = require('multer');
 
 // Load .env from the backend directory, not wherever the script is run from
 dotenv.config({ path: path.join(__dirname, '.env') });
@@ -78,7 +79,14 @@ app.use('/api/coupons', couponRoutes);
 
 app.use((err, _req, res, _next) => {
   console.error('Unhandled server error:', err);
-  res.status(500).json({ message: 'Internal server error' });
+  if (err instanceof multer.MulterError) {
+    const message = err.code === 'LIMIT_FILE_SIZE'
+      ? 'Image is too large. Please upload an image under 5 MB.'
+      : err.message;
+    return res.status(400).json({ message, code: err.code });
+  }
+
+  res.status(500).json({ message: err.message || 'Internal server error' });
 });
 
 // Auto-run schema creation if tables don't exist
@@ -262,4 +270,3 @@ app.listen(PORT, async () => {
     console.log('⚠️  Server will run without database - API endpoints may return errors');
   }
 });
-

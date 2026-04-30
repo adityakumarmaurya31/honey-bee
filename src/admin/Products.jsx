@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API_BASE, getAuthHeaders, handleAuthError } from './api.js';
 
-const emptyForm = { name: '', price: '', description: '', stock: '', discount: '', image: null };
+const emptyForm = { name: '', price: '', description: '', stock: '', discount: '', image: null, currentImage: null };
 
 const Products = () => {
   const navigate = useNavigate();
@@ -11,6 +11,7 @@ const Products = () => {
   const [editing, setEditing] = useState(null);
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
+  const [imagePreview, setImagePreview] = useState(null);
 
   const loadProducts = async () => {
     try {
@@ -35,6 +36,7 @@ const Products = () => {
     setForm(emptyForm);
     setEditing(null);
     setMessage('');
+    setImagePreview(null);
   };
 
   const handleSubmit = async (event) => {
@@ -42,19 +44,62 @@ const Products = () => {
     setLoading(true);
     setMessage('');
 
+    // Validate form before submission
+    if (!form.name || form.name.trim() === '') {
+      setMessage('❌ Product name is required');
+      setLoading(false);
+      return;
+    }
+    if (!form.price || form.price === '' || parseFloat(form.price) <= 0) {
+      setMessage('❌ Price must be a positive number');
+      setLoading(false);
+      return;
+    }
+    if (!form.description || form.description.trim() === '') {
+      setMessage('❌ Description is required');
+      setLoading(false);
+      return;
+    }
+    if (!form.stock || form.stock === '' || parseInt(form.stock) < 0) {
+      setMessage('❌ Stock must be a non-negative number');
+      setLoading(false);
+      return;
+    }
+    if (!editing && !form.image) {
+      setMessage('❌ Image is required for new products');
+      setLoading(false);
+      return;
+    }
+
     try {
       const body = new FormData();
-      body.append('name', form.name);
-      body.append('price', form.price);
-      body.append('discount', form.discount || 0);
-      body.append('description', form.description);
-      body.append('stock', form.stock);
+      body.append('name', form.name.trim());
+      body.append('price', form.price.toString());
+      body.append('discount', form.discount ? form.discount.toString() : '0');
+      body.append('description', form.description.trim());
+      body.append('stock', form.stock.toString());
+      
+      // Append image if provided (new file or existing)
       if (form.image) {
+        console.log('[Products] Appending NEW image file:', form.image.name);
         body.append('image', form.image);
+      } else if (editing && form.currentImage) {
+        console.log('[Products] Keeping existing image:', form.currentImage);
       }
 
       const method = editing ? 'PUT' : 'POST';
       const url = editing ? `${API_BASE}/api/admin/products/${editing.id}` : `${API_BASE}/api/admin/products`;
+
+      console.log(`[Products] Submitting ${method} request to ${url}`);
+      console.log('[Products] Form data:', { 
+        name: form.name.trim(),
+        price: form.price,
+        discount: form.discount,
+        description: form.description.substring(0, 30) + '...',
+        stock: form.stock,
+        hasImage: !!form.image,
+        hasCurrentImage: !!form.currentImage
+      });
 
       const response = await fetch(url, {
         method,
@@ -63,17 +108,35 @@ const Products = () => {
       });
 
       if (handleAuthError(response, navigate)) return;
-      const data = await response.json();
+      
+      const responseText = await response.text();
+      let data;
+      try {
+        data = responseText ? JSON.parse(responseText) : {};
+      } catch (parseErr) {
+        data = { message: responseText || 'Server returned invalid response' };
+      }
+
       if (!response.ok) {
-        setMessage(data.message || 'Save failed');
+        // Show detailed error message
+        const errorMsg = data.message || data.error || data.details || 'Failed to save product';
+        console.error('[Products] Server error:', errorMsg, data);
+        setMessage(`❌ ${errorMsg}`);
         return;
       }
 
-      setMessage(editing ? 'Product updated successfully' : 'Product added successfully');
+      console.log('[Products] Success! Product saved:', data.id, 'New image:', data.image);
+      setMessage(editing ? '✅ Product updated successfully!' : '✅ Product added successfully!');
+      
+      // Clear form and reload products
       resetForm();
-      loadProducts();
+      setTimeout(() => {
+        loadProducts();
+      }, 500);
+      
     } catch (err) {
-      setMessage('Unable to save product');
+      console.error('[Products] Submit error:', err);
+      setMessage(`❌ Unable to save product: ${err.message}`);
     } finally {
       setLoading(false);
     }
@@ -88,8 +151,23 @@ const Products = () => {
       stock: product.stock.toString(),
       discount: (product.discount || 0).toString(),
       image: null,
+      currentImage: product.image,
     });
+    setImagePreview(null);
     setMessage('');
+  };
+
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setForm({ ...form, image: file });
+      // Create preview
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const deleteProduct = async (id) => {
@@ -147,7 +225,51 @@ const Products = () => {
             <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} required rows="4" className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-slate-900 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100" />
 
             <label className="block text-sm font-medium text-slate-700">Image</label>
-            <input type="file" accept="image/*" onChange={(e) => setForm({ ...form, image: e.target.files[0] })} className="w-full text-slate-700" />
+            
+            {editing && form.currentImage && !imagePreview && (
+              <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-xs text-blue-700 font-semibold mb-2">📷 Current Image:</p>
+                <img
+                  src={
+                    form.currentImage.startsWith('http')
+                      ? form.currentImage
+                      : form.currentImage.startsWith('/uploads')
+                      ? `${API_BASE}${form.currentImage}?t=${Date.now()}`
+                      : `${API_BASE}/uploads/${form.currentImage}?t=${Date.now()}`
+                  }
+                  alt="Current product"
+                  className="h-24 w-24 rounded-xl object-cover"
+                  onError={(e) => console.error('Current image failed to load:', form.currentImage, e)}
+                />
+                <p className="text-xs text-blue-600 mt-2">👉 Select a new image below to replace it</p>
+              </div>
+            )}
+            
+            {imagePreview && (
+              <div className="mb-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                <p className="text-xs text-green-700 font-semibold mb-2">✅ New Image Preview:</p>
+                <img src={imagePreview} alt="Preview" className="h-24 w-24 rounded-xl object-cover" />
+                <p className="text-xs text-green-600 mt-2">Ready to upload on save</p>
+              </div>
+            )}
+            
+            <div className="mb-3 border-2 border-dashed border-slate-300 rounded-lg p-4">
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleImageChange}
+                className="w-full text-slate-700 cursor-pointer"
+              />
+              <p className="text-xs text-slate-600 mt-2">
+                {editing ? (
+                  imagePreview 
+                    ? '✅ New image selected - click Update to save' 
+                    : '📁 Select a new image to replace current one'
+                ) : (
+                  '📁 Required - Select a product image'
+                )}
+              </p>
+            </div>
 
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <button type="submit" disabled={loading} className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60">
@@ -159,7 +281,7 @@ const Products = () => {
                 </button>
               )}
             </div>
-            {message && <p className="text-sm text-slate-700">{message}</p>}
+            {message && <p className="mt-2 text-sm text-slate-700">{message}</p>}
           </form>
         </div>
 
@@ -177,16 +299,32 @@ const Products = () => {
               </tr>
             </thead>
             <tbody>
-              {products.map((product) => (
+              {products.map((product) => {
+                // Construct proper image URL
+                let imageUrl = null;
+                if (product.image) {
+                  if (product.image.startsWith('http')) {
+                    imageUrl = product.image;
+                  } else if (product.image.startsWith('/uploads')) {
+                    imageUrl = `${API_BASE}${product.image}?t=${Date.now()}`;
+                  } else {
+                    imageUrl = `${API_BASE}/uploads/${product.image}?t=${Date.now()}`;
+                  }
+                }
+                
+                return (
                 <tr key={product.id} className="border-b border-slate-100 hover:bg-slate-50">
                   <td className="py-4">
                     <div className="flex items-center gap-3">
-                      {product.image && (
+                      {imageUrl ? (
                         <img
-                          src={product.image.startsWith('/uploads') ? `${API_BASE}${product.image}` : product.image}
+                          src={imageUrl}
                           alt={product.name}
                           className="h-14 w-14 rounded-2xl object-cover"
+                          onError={(e) => console.error('Image failed to load:', imageUrl, e)}
                         />
+                      ) : (
+                        <div className="h-14 w-14 rounded-2xl bg-gray-200 flex items-center justify-center text-xs text-gray-500">No image</div>
                       )}
                       <div>
                         <div className="font-semibold text-slate-900">{product.name}</div>
@@ -209,13 +347,14 @@ const Products = () => {
                     </button>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
       </div>
     </div>
   );
-};
+}
 
 export default Products;

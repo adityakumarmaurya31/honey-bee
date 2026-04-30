@@ -7,6 +7,7 @@ function ProductList({ onAddToCart, limit, showViewAllLink = false }) {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [imageErrors, setImageErrors] = useState({});
 
   useEffect(() => {
     const loadProducts = async () => {
@@ -52,9 +53,22 @@ function ProductList({ onAddToCart, limit, showViewAllLink = false }) {
               <article key={item.id} className="product-card">
                 <div className="product-image-wrapper">
                   <img
-                    src={item.image?.startsWith('/uploads') ? `${API_BASE}${item.image}` : item.image}
+                    src={
+                      imageErrors[item.id]
+                        ? '/honey.jpg'
+                        : item.image?.startsWith('/uploads')
+                        ? `${API_BASE}${item.image}`
+                        : item.image || '/honey.jpg'
+                    }
                     alt={item.name}
                     className="product-image"
+                    onError={(e) => {
+                      console.warn(`Image load failed for product ${item.id}:`, item.image);
+                      setImageErrors((prev) => ({ ...prev, [item.id]: true }));
+                    }}
+                    onLoad={() => {
+                      console.log(`Image loaded for product ${item.id}:`, item.image);
+                    }}
                   />
                   {item.stock === 0 && (
                     <span className="absolute inset-0 bg-black/50 flex items-center justify-center text-white font-bold text-lg">

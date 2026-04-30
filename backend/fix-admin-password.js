@@ -1,30 +1,31 @@
 const pool = require('./db.js');
 
-async function fixAdminPassword() {
+(async () => {
   try {
-    const conn = await pool.getConnection();
-
-    console.log('Connected to database...');
+    // Correct bcrypt hash for 'Admin@123'
+    const hash = '$2b$12$LxBOAtbv0SgwfAuPWJeGRuDmXdzGuAwJxHXCevnwas8SLQ9p5A1ZK';
     
-    // Delete existing admin user
-    await conn.execute("DELETE FROM users WHERE email='admin@honeybee.com'");
-    console.log('Old admin user deleted');
-    
-    // Insert new admin user with correct password hash
-    const passwordHash = '$2b$10$LPuDcgTkh6FrXs2celOsveCKlHAYEx8ksnwBuuOiBEJ8iMZrOQSc2';
-    await conn.execute(
-      "INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)",
-      ['Admin User', 'admin@honeybee.com', passwordHash, 'admin']
+    console.log('🔐 Updating admin password to Admin@123...');
+    const [result] = await pool.query(
+      'UPDATE users SET password = ? WHERE email = ?',
+      [hash, 'admin@honeybee.com']
     );
-    console.log('✓ Admin password updated successfully!');
-    console.log('Email: admin@honeybee.com');
-    console.log('Password: admin123');
     
-    conn.release();
-  } catch (error) {
-    console.error('Error updating admin password:', error.message);
+    console.log('✅ Updated', result.affectedRows, 'rows');
+    
+    // Verify
+    const [check] = await pool.query('SELECT email, password FROM users WHERE email = ?', ['admin@honeybee.com']);
+    if (check.length > 0) {
+      console.log('Verified hash (first 30 chars):', check[0].password.substring(0, 30));
+    }
+    
+    console.log('\n📧 Admin Credentials Ready:');
+    console.log('Email: admin@honeybee.com');
+    console.log('Password: Admin@123');
+    
+    process.exit(0);
+  } catch (e) {
+    console.error('Error:', e.message);
     process.exit(1);
   }
-}
-
-fixAdminPassword();
+})();
