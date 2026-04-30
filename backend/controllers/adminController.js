@@ -46,10 +46,8 @@ const saveUploadedImage = async (file, folder = 'products') => {
     return uploadBufferToS3(file.buffer, file.originalname, file.mimetype, folder);
   }
 
-  if (process.env.VERCEL) {
-    const error = new Error('Image upload storage is not configured. Use the Render backend URL or set AWS_S3_BUCKET for Vercel uploads.');
-    error.statusCode = 503;
-    throw error;
+  if (folder === 'products') {
+    return `data:${file.mimetype};base64,${file.buffer.toString('base64')}`;
   }
 
   const uploadsDir = path.join(__dirname, '..', 'uploads');

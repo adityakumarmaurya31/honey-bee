@@ -47,6 +47,10 @@ function ProductList({ onAddToCart, limit, showViewAllLink = false }) {
     }
 
     const rawImage = item.image || '/honey.jpg';
+    if (rawImage.startsWith('data:')) {
+      return rawImage;
+    }
+
     const imageUrl = rawImage.startsWith('/uploads') ? `${API_BASE}${rawImage}` : rawImage;
     const separator = imageUrl.includes('?') ? '&' : '?';
     const version = encodeURIComponent(rawImage);

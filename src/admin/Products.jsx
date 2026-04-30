@@ -180,6 +180,14 @@ const Products = () => {
     }
   };
 
+  const getProductImageSrc = (image) => {
+    if (!image) return null;
+    if (image.startsWith('data:') || image.startsWith('http')) return image;
+    if (image.startsWith('/uploads')) return `${API_BASE}${image}?t=${Date.now()}`;
+    if (image.startsWith('/')) return `${image}?t=${Date.now()}`;
+    return `${API_BASE}/uploads/${image}?t=${Date.now()}`;
+  };
+
   const deleteProduct = async (id) => {
     if (!window.confirm('Delete this product?')) return;
     try {
@@ -246,11 +254,7 @@ const Products = () => {
                 <p className="text-xs text-blue-700 font-semibold mb-2">📷 Current Image:</p>
                 <img
                   src={
-                    form.currentImage.startsWith('http')
-                      ? form.currentImage
-                      : form.currentImage.startsWith('/uploads')
-                      ? `${API_BASE}${form.currentImage}?t=${Date.now()}`
-                      : `${API_BASE}/uploads/${form.currentImage}?t=${Date.now()}`
+                    getProductImageSrc(form.currentImage)
                   }
                   alt="Current product"
                   className="h-24 w-24 rounded-xl object-cover"
@@ -320,13 +324,7 @@ const Products = () => {
                 // Construct proper image URL
                 let imageUrl = null;
                 if (product.image) {
-                  if (product.image.startsWith('http')) {
-                    imageUrl = product.image;
-                  } else if (product.image.startsWith('/uploads')) {
-                    imageUrl = `${API_BASE}${product.image}?t=${Date.now()}`;
-                  } else {
-                    imageUrl = `${API_BASE}/uploads/${product.image}?t=${Date.now()}`;
-                  }
+                  imageUrl = getProductImageSrc(product.image);
                 }
                 
                 return (

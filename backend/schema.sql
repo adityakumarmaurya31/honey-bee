@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS products (
   price DECIMAL(10,2) NOT NULL,
   discount DECIMAL(5,2) DEFAULT 0 COMMENT 'Discount percentage (0-100)',
   stock INT NOT NULL DEFAULT 0,
-  image VARCHAR(255),
+  image LONGTEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

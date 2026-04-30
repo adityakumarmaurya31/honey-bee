@@ -237,6 +237,7 @@ async function initializeDatabase() {
     await ensureTrackingColumns();
     await migrateCoupons();
     await addCouponDiscountColumns();
+    await pool.query('ALTER TABLE products MODIFY image LONGTEXT NULL');
 
     return true;
   } catch (error) {
