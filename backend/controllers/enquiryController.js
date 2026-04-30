@@ -30,6 +30,10 @@ const createEnquiry = async (req, res) => {
 
 const getEnquiries = async (req, res) => {
   try {
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
+
     const [enquiries] = await pool.query(
       'SELECT * FROM enquiries ORDER BY created_at DESC'
     );
@@ -72,10 +76,14 @@ const updateEnquiry = async (req, res) => {
 
     const replied_at = status === 'Replied' ? new Date() : null;
 
-    await pool.query(
+    const [result] = await pool.query(
       'UPDATE enquiries SET status = ?, admin_reply = ?, replied_at = ? WHERE id = ?',
       [status, admin_reply || null, replied_at, id]
     );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: 'Enquiry not found' });
+    }
 
     const [[enquiry]] = await pool.query('SELECT * FROM enquiries WHERE id = ?', [id]);
     res.json(enquiry);
@@ -89,7 +97,11 @@ const deleteEnquiry = async (req, res) => {
   try {
     const { id } = req.params;
 
-    await pool.query('DELETE FROM enquiries WHERE id = ?', [id]);
+    const [result] = await pool.query('DELETE FROM enquiries WHERE id = ?', [id]);
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: 'Enquiry not found' });
+    }
+
     res.json({ message: 'Enquiry deleted successfully' });
   } catch (error) {
     console.error('Delete enquiry error:', error);

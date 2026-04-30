@@ -17,6 +17,7 @@ const Enquiries = () => {
       setLoading(true);
       const response = await fetch(`${API_BASE}/api/admin/enquiries`, {
         headers: getAuthHeaders(),
+        cache: 'no-store',
       });
       if (handleAuthError(response, navigate)) return;
       const data = await response.json();
@@ -57,6 +58,7 @@ const Enquiries = () => {
       );
       setSelectedEnquiry(null);
       setReplyText('');
+      loadEnquiries();
       setTimeout(() => setMessage(''), 3000);
     } catch (err) {
       setMessage('Unable to update enquiry');
@@ -78,7 +80,7 @@ const Enquiries = () => {
         return;
       }
       setMessage('✅ Enquiry deleted');
-      setEnquiries((prev) => prev.filter((e) => e.id !== enquiryId));
+      loadEnquiries();
       setTimeout(() => setMessage(''), 3000);
     } catch (err) {
       setMessage('Unable to delete enquiry');

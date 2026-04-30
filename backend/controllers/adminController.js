@@ -537,7 +537,7 @@ const updateOrderStatus = async (req, res) => {
       }
     }
 
-    await pool.query(
+    const [updateResult] = await pool.query(
       `UPDATE orders
        SET status = ?,
            trackingNumber = ?,
@@ -549,6 +549,10 @@ const updateOrderStatus = async (req, res) => {
        WHERE id = ?`,
       [status, normalizedTrackingNumber, normalizedTrackingNumber, normalizedTrackingNumber, id]
     );
+
+    if (updateResult.affectedRows === 0) {
+      return res.status(404).json({ message: 'Order not found' });
+    }
 
     const [[order]] = await pool.query('SELECT * FROM orders WHERE id = ?', [id]);
     res.json(order);
@@ -573,7 +577,11 @@ const getUsers = async (req, res) => {
 const deleteUser = async (req, res) => {
   try {
     const { id } = req.params;
-    await pool.query('DELETE FROM users WHERE id = ?', [id]);
+    const [result] = await pool.query('DELETE FROM users WHERE id = ?', [id]);
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
     res.json({ message: 'User deleted' });
   } catch (error) {
     console.error(error);

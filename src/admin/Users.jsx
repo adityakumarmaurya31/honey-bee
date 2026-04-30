@@ -11,6 +11,7 @@ const Users = () => {
     try {
       const response = await fetch(`${API_BASE}/api/admin/users`, {
         headers: getAuthHeaders(),
+        cache: 'no-store',
       });
       if (handleAuthError(response, navigate)) return;
       const data = await response.json();
@@ -32,7 +33,12 @@ const Users = () => {
         headers: getAuthHeaders(),
       });
       if (handleAuthError(response, navigate)) return;
-      await response.json();
+      const data = await response.json();
+      if (!response.ok) {
+        setMessage(data.message || 'Unable to remove user');
+        return;
+      }
+
       setMessage('User removed');
       loadUsers();
     } catch (err) {

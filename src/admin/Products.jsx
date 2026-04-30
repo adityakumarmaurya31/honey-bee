@@ -188,7 +188,12 @@ const Products = () => {
         headers: getAuthHeaders(),
       });
       if (handleAuthError(response, navigate)) return;
-      await response.json();
+      const data = await response.json();
+      if (!response.ok) {
+        setMessage(data.message || 'Unable to delete product');
+        return;
+      }
+
       setMessage('Product deleted');
       loadProducts();
     } catch (err) {

@@ -3,6 +3,10 @@ const pool = require('../db.js');
 // Get all coupons
 const getAllCoupons = async (req, res) => {
   try {
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
+
     const [coupons] = await pool.query(
       'SELECT * FROM coupons ORDER BY created_at DESC'
     );

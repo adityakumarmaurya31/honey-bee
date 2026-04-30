@@ -19,6 +19,7 @@ const Orders = () => {
       setLoading(true);
       const response = await fetch(`${API_BASE}/api/admin/orders`, {
         headers: getAuthHeaders(),
+        cache: 'no-store',
       });
       if (handleAuthError(response, navigate)) return;
       const data = await response.json();
@@ -75,6 +76,7 @@ const Orders = () => {
         ...prev,
         [orderId]: data.trackingNumber || '',
       }));
+      loadOrders();
     } catch (err) {
       setMessage('Unable to update order');
     }

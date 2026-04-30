@@ -20,6 +20,7 @@ const Dashboard = () => {
   const fetchStats = async () => {
     const response = await fetch(`${API_BASE}/api/admin/dashboard-stats`, {
       headers: getAuthHeaders(),
+      cache: 'no-store',
     });
     if (handleAuthError(response, navigate)) return null;
     return response.ok ? await response.json() : null;
@@ -28,6 +29,7 @@ const Dashboard = () => {
   const fetchProducts = async () => {
     const response = await fetch(`${API_BASE}/api/admin/products`, {
       headers: getAuthHeaders(),
+      cache: 'no-store',
     });
     if (handleAuthError(response, navigate)) return [];
     return response.ok ? await response.json() : [];
@@ -36,6 +38,7 @@ const Dashboard = () => {
   const fetchOrders = async () => {
     const response = await fetch(`${API_BASE}/api/admin/orders`, {
       headers: getAuthHeaders(),
+      cache: 'no-store',
     });
     if (handleAuthError(response, navigate)) return [];
     return response.ok ? await response.json() : [];

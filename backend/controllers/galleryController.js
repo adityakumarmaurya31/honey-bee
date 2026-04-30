@@ -35,6 +35,10 @@ const uploadBufferToS3 = async (buffer, originalName, mimeType, folder = 'galler
 
 const getGallery = async (req, res) => {
   try {
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
+
     const [items] = await pool.query(
       'SELECT * FROM gallery ORDER BY created_at DESC'
     );
@@ -135,7 +139,11 @@ const deleteGalleryItem = async (req, res) => {
   try {
     const { id } = req.params;
 
-    await pool.query('DELETE FROM gallery WHERE id = ?', [id]);
+    const [result] = await pool.query('DELETE FROM gallery WHERE id = ?', [id]);
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: 'Gallery item not found' });
+    }
+
     res.json({ message: 'Gallery item deleted successfully' });
   } catch (error) {
     console.error('Delete gallery item error:', error);
@@ -152,10 +160,14 @@ const updateGalleryItem = async (req, res) => {
       return res.status(400).json({ message: 'Title is required' });
     }
 
-    await pool.query(
+    const [result] = await pool.query(
       'UPDATE gallery SET title = ?, description = ? WHERE id = ?',
       [title, description || null, id]
     );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: 'Gallery item not found' });
+    }
 
     const [[item]] = await pool.query('SELECT * FROM gallery WHERE id = ?', [id]);
     res.json(item);

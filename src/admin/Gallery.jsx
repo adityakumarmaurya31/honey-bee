@@ -21,7 +21,7 @@ const Gallery = () => {
   const loadGallery = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_BASE}/api/gallery`);
+      const response = await fetch(`${API_BASE}/api/gallery`, { cache: 'no-store' });
       if (!response.ok) {
         setMessage('Unable to load gallery');
         return;
@@ -119,7 +119,7 @@ const Gallery = () => {
       }
 
       setMessage('✅ Gallery item deleted');
-      setItems(prev => prev.filter(item => item.id !== id));
+      loadGallery();
       setTimeout(() => setMessage(''), 3000);
     } catch (error) {
       setMessage('❌ Unable to delete item');

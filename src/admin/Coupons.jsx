@@ -27,7 +27,8 @@ const Coupons = () => {
     try {
       setLoading(true);
       const response = await fetch(`${API_BASE}/api/coupons`, {
-        headers: getAuthHeaders()
+        headers: getAuthHeaders(),
+        cache: 'no-store',
       });
       if (handleAuthError(response, navigate)) return;
 
