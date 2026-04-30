@@ -51,7 +51,7 @@ function CheckoutPage({ cartItems, onClear }) {
     return item.price * (1 - discount / 100);
   };
 
-  const total = cartItems.reduce((sum, item) => sum + getDiscountedPrice(item), 0);
+  const total = cartItems.reduce((sum, item) => sum + getDiscountedPrice(item) * item.quantity, 0);
   const payableTotal = total - couponDiscount;
 
   const validateCoupon = async () => {
@@ -162,6 +162,16 @@ function CheckoutPage({ cartItems, onClear }) {
     // Show UPI Payment Component
     setShowUPIPayment(true);
     setIsSubmitting(false);
+  };
+
+  const handlePaymentMethodChange = (paymentMethod) => {
+    setForm({ ...form, paymentMethod });
+    setIsSubmitting(false);
+    setMessage('');
+
+    if (paymentMethod === 'COD') {
+      setShowUPIPayment(false);
+    }
   };
 
   const orderItems = cartItems.map((item) => ({ product_id: item.id, quantity: item.quantity }));
@@ -320,7 +330,7 @@ function CheckoutPage({ cartItems, onClear }) {
               name="payment"
               value="COD"
               checked={form.paymentMethod === 'COD'}
-              onChange={(e) => setForm({ ...form, paymentMethod: e.target.value })}
+              onChange={(e) => handlePaymentMethodChange(e.target.value)}
             />
             Cash on Delivery (COD)
           </label>
@@ -330,7 +340,7 @@ function CheckoutPage({ cartItems, onClear }) {
               name="payment"
               value="UPI"
               checked={form.paymentMethod === 'UPI'}
-              onChange={(e) => setForm({ ...form, paymentMethod: e.target.value })}
+              onChange={(e) => handlePaymentMethodChange(e.target.value)}
             />
             UPI Payment (Google Pay, PhonePe, etc)
           </label>
@@ -355,7 +365,7 @@ function CheckoutPage({ cartItems, onClear }) {
             type="submit"
             className="btn btn-primary"
             style={{ marginTop: '10px' }}
-            disabled={isSubmitting || showUPIPayment}
+            disabled={isSubmitting || (form.paymentMethod === 'UPI' && showUPIPayment)}
           >
             {isSubmitting
               ? 'Processing...'

@@ -88,6 +88,7 @@ const UPIPayment = ({ amount, orderId, orderDetails, onPaymentVerified }) => {
               <div className="flex items-center justify-between gap-2 bg-slate-50 p-3 rounded-lg">
                 <p className="font-mono text-lg font-bold text-slate-900">{UPI_ID}</p>
                 <button
+                  type="button"
                   onClick={copyToClipboard}
                   className="px-3 py-1 bg-blue-500 text-white text-sm rounded-lg hover:bg-blue-600 whitespace-nowrap"
                 >
@@ -115,6 +116,7 @@ const UPIPayment = ({ amount, orderId, orderDetails, onPaymentVerified }) => {
 
             {/* Manual Verification */}
             <button
+              type="button"
               onClick={() => setShowManualVerification(!showManualVerification)}
               className="w-full px-4 py-2 bg-slate-200 text-slate-900 font-semibold rounded-lg hover:bg-slate-300"
             >
@@ -137,6 +139,7 @@ const UPIPayment = ({ amount, orderId, orderDetails, onPaymentVerified }) => {
                   💡 Find this in your UPI app's transaction details or confirmation message
                 </p>
                 <button
+                  type="button"
                   onClick={handleVerifyPayment}
                   disabled={verifying || !transactionId.trim()}
                   className="w-full px-4 py-3 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
