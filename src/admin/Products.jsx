@@ -17,6 +17,7 @@ const Products = () => {
     try {
       const response = await fetch(`${API_BASE}/api/admin/products`, {
         headers: getAuthHeaders(),
+        cache: 'no-store',
       });
 
       if (handleAuthError(response, navigate)) return;

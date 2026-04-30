@@ -64,7 +64,13 @@ app.use(express.urlencoded({ extended: true }));
 // Static uploads directory
 const uploadsDir = path.join(__dirname, '..', 'backend', 'uploads');
 if (fs.existsSync(uploadsDir)) {
-  app.use('/uploads', express.static(uploadsDir));
+  app.use('/uploads', express.static(uploadsDir, {
+    setHeaders: (res) => {
+      res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      res.set('Pragma', 'no-cache');
+      res.set('Expires', '0');
+    },
+  }));
 }
 
 // Health check endpoint

@@ -15,7 +15,7 @@ function ProductList({ onAddToCart, limit, showViewAllLink = false }) {
       setError('');
 
       try {
-        const response = await fetch(`${API_BASE}/api/products`);
+        const response = await fetch(`${API_BASE}/api/products`, { cache: 'no-store' });
         if (!response.ok) {
           setError('Unable to load products');
           return;
@@ -41,6 +41,19 @@ function ProductList({ onAddToCart, limit, showViewAllLink = false }) {
     navigate('/checkout');
   };
 
+  const getImageSrc = (item) => {
+    if (imageErrors[item.id]) {
+      return '/honey.jpg';
+    }
+
+    const rawImage = item.image || '/honey.jpg';
+    const imageUrl = rawImage.startsWith('/uploads') ? `${API_BASE}${rawImage}` : rawImage;
+    const separator = imageUrl.includes('?') ? '&' : '?';
+    const version = encodeURIComponent(rawImage);
+
+    return `${imageUrl}${separator}v=${version}`;
+  };
+
   return (
     <section>
       {error && <p className="text-red-600 mb-4">{error}</p>}
@@ -53,13 +66,7 @@ function ProductList({ onAddToCart, limit, showViewAllLink = false }) {
               <article key={item.id} className="product-card">
                 <div className="product-image-wrapper">
                   <img
-                    src={
-                      imageErrors[item.id]
-                        ? '/honey.jpg'
-                        : item.image?.startsWith('/uploads')
-                        ? `${API_BASE}${item.image}`
-                        : item.image || '/honey.jpg'
-                    }
+                    src={getImageSrc(item)}
                     alt={item.name}
                     className="product-image"
                     onError={(e) => {
