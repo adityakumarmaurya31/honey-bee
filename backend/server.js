@@ -10,10 +10,6 @@ dotenv.config({ path: path.join(__dirname, '.env') });
 
 const pool = require('./db.js');
 const { testConnection } = require('./db.js');
-const ensureTrackingColumns = require('./ensureTrackingColumns.js');
-const { migrateCoupons } = require('./migrate-coupons.js');
-const addCouponDiscountColumns = require('./migrate-coupon-discount.js');
-const migrateGalleryMedia = require('./migrate-gallery-media.js');
 const adminRoutes = require('./routes/admin.js');
 const productRoutes = require('./routes/products.js');
 const orderRoutes = require('./routes/orderRoutes.js');
