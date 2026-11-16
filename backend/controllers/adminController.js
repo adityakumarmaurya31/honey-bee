@@ -73,6 +73,9 @@ const getDatabaseErrorMessage = (error) => {
 
 const getProductImageUrl = (req, imagePath) => {
   if (!imagePath) return null;
+  if (imagePath.startsWith('data:')) {
+    return imagePath;
+  }
   // Return just the path - frontend will handle URL construction
   // This ensures the path is consistent whether called from different domains
   if (imagePath.startsWith('http')) {
