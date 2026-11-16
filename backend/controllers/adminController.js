@@ -540,8 +540,8 @@ const updateOrderStatus = async (req, res) => {
        SET status = ?,
            trackingnumber = ?,
            trackingassignedat = CASE
-             WHEN ? IS NULL THEN NULL
-             WHEN trackingnumber <> ? OR trackingassignedat IS NULL THEN CURRENT_TIMESTAMP
+             WHEN ?::text IS NULL THEN NULL
+             WHEN trackingnumber IS DISTINCT FROM ?::text OR trackingassignedat IS NULL THEN CURRENT_TIMESTAMP
              ELSE trackingassignedat
            END
        WHERE id = ?`,
