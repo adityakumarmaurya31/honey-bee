@@ -475,8 +475,8 @@ const getOrder = async (req, res) => {
     const { id } = req.params;
     const [orders] = await pool.query(
       `SELECT o.id, o.user_id, u.name AS user_name, u.email AS user_email, o.status, o.total, o.created_at,
-              o.address, o.city, o.state, o.pincode, o.phone, o.paymentMethod,
-              o.trackingNumber, o.trackingAssignedAt, o.coupon_discount
+              o.address, o.city, o.state, o.pincode, o.phone, o.paymentmethod,
+              o.trackingnumber, o.trackingassignedat, o.coupon_discount
        FROM orders o
        JOIN users u ON o.user_id = u.id
        WHERE o.id = ?`,
@@ -590,8 +590,8 @@ const deleteUser = async (req, res) => {
 const getOrders = async (req, res) => {
   try {
     const [orders] = await pool.query(
-      `SELECT o.id, o.user_id, u.name AS user_name, u.email AS user_email, o.status, o.total, o.paymentMethod,
-              o.trackingNumber, o.trackingAssignedAt, o.created_at, o.coupon_discount
+            `SELECT o.id, o.user_id, u.name AS user_name, u.email AS user_email, o.status, o.total, o.paymentmethod,
+              o.trackingnumber, o.trackingassignedat, o.created_at, o.coupon_discount
        FROM orders o
        JOIN users u ON o.user_id = u.id
        ORDER BY o.created_at DESC`
