@@ -12,8 +12,10 @@ services:
         value: 10000
       - key: CLIENT_URL
         value: https://honey-bee-alpha.vercel.app
+      - key: DB_SSL
+        value: true
 
-      # ⚠️  DATABASE CONFIGURATION
+      # ⚠️  POSTGRESQL DATABASE CONFIGURATION
       # YOU MUST SET THESE IN RENDER DASHBOARD!
       # Read RENDER_DATABASE_SETUP.md for complete instructions
       # 
@@ -28,10 +30,8 @@ services:
       # DB_NAME=<your_database_name>
       # DB_SSL=true
       #
-      # Examples:
-      # - Railway: host = monorail.proxy.rlwy.net, user = root
-      # - PlanetScale: host = aws.connect.psdb.cloud
-      # - Aiven: host = your-db-xxx.aivencloud.com
+      # Example:
+      # - Aiven PostgreSQL: host = your-db-xxx.aivencloud.com, port = 5432
 
       # ⚠️  SECURITY & JWT (SET IN RENDER DASHBOARD)
       # Generate random strings and set these:

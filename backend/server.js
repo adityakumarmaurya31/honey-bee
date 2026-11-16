@@ -13,6 +13,7 @@ const { testConnection } = require('./db.js');
 const ensureTrackingColumns = require('./ensureTrackingColumns.js');
 const { migrateCoupons } = require('./migrate-coupons.js');
 const addCouponDiscountColumns = require('./migrate-coupon-discount.js');
+const migrateGalleryMedia = require('./migrate-gallery-media.js');
 const adminRoutes = require('./routes/admin.js');
 const productRoutes = require('./routes/products.js');
 const orderRoutes = require('./routes/orderRoutes.js');
@@ -27,8 +28,8 @@ const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
 // Log database configuration (without password) for debugging
 const dbDebugInfo = {
   host: process.env.DB_HOST || 'localhost',
-  port: process.env.DB_PORT || '3306 (default)',
-  user: process.env.DB_USER || 'root',
+  port: process.env.DB_PORT || '5432 (default)',
+  user: process.env.DB_USER || 'postgres',
   database: process.env.DB_NAME || 'honeybee',
   ssl: process.env.DB_SSL || 'not set',
   passwordSet: !!process.env.DB_PASSWORD,
@@ -101,143 +102,19 @@ app.use((err, _req, res, _next) => {
   res.status(500).json({ message: err.message || 'Internal server error' });
 });
 
-// Auto-run schema creation if tables don't exist
+// Verify the PostgreSQL schema exists; create it with npm run setup-db when needed.
 async function initializeDatabase() {
   try {
-    // Test basic connection first
     await pool.query('SELECT 1');
-
-    const dbName = process.env.DB_NAME || 'honeybee';
-    
-    // Check if 'users' table exists
     const [tables] = await pool.query(
-      `SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'users'`,
-      [dbName]
+      `SELECT table_name FROM information_schema.tables WHERE table_schema = current_schema() AND table_name = 'users'`
     );
 
     if (tables.length === 0) {
-      console.log('⚠️  No tables found. Creating database schema...');
-      
-      // Create tables with hardcoded SQL (more reliable than parsing)
-      const createTableStatements = [
-        `CREATE TABLE IF NOT EXISTS users (
-          id INT AUTO_INCREMENT PRIMARY KEY,
-          name VARCHAR(100) NOT NULL,
-          email VARCHAR(200) NOT NULL UNIQUE,
-          password VARCHAR(255) NOT NULL,
-          role ENUM('admin','user') NOT NULL DEFAULT 'user',
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )`,
-        
-        `CREATE TABLE IF NOT EXISTS products (
-          id INT AUTO_INCREMENT PRIMARY KEY,
-          name VARCHAR(255) NOT NULL,
-          description TEXT NOT NULL,
-          price DECIMAL(10,2) NOT NULL,
-          discount DECIMAL(5,2) DEFAULT 0,
-          stock INT NOT NULL DEFAULT 0,
-          image VARCHAR(255),
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )`,
-        
-        `CREATE TABLE IF NOT EXISTS coupons (
-          id INT AUTO_INCREMENT PRIMARY KEY,
-          code VARCHAR(50) NOT NULL UNIQUE,
-          discount_type ENUM('percentage', 'fixed') NOT NULL,
-          discount_value DECIMAL(10,2) NOT NULL,
-          max_discount DECIMAL(10,2) NULL,
-          min_amount DECIMAL(10,2) NULL,
-          description TEXT,
-          usage_limit INT NULL,
-          expiry_date DATETIME NULL,
-          is_active TINYINT DEFAULT 1,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-        )`,
-        
-        `CREATE TABLE IF NOT EXISTS orders (
-          id INT AUTO_INCREMENT PRIMARY KEY,
-          order_number VARCHAR(50) UNIQUE NOT NULL,
-          customer_name VARCHAR(100) NOT NULL,
-          customer_email VARCHAR(100) NOT NULL,
-          customer_phone VARCHAR(20) NOT NULL,
-          delivery_address TEXT NOT NULL,
-          total_amount DECIMAL(10,2) NOT NULL,
-          discount_amount DECIMAL(10,2) DEFAULT 0,
-          payment_method ENUM('card', 'upi', 'cod') NOT NULL,
-          order_status ENUM('pending', 'confirmed', 'shipped', 'delivered', 'cancelled') DEFAULT 'pending',
-          tracking_number VARCHAR(100),
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-        )`,
-        
-        `CREATE TABLE IF NOT EXISTS order_items (
-          id INT AUTO_INCREMENT PRIMARY KEY,
-          order_id INT NOT NULL,
-          product_id INT NOT NULL,
-          quantity INT NOT NULL,
-          price DECIMAL(10,2) NOT NULL,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          FOREIGN KEY (order_id) REFERENCES orders(id)
-        )`,
-        
-        `CREATE TABLE IF NOT EXISTS enquiries (
-          id INT AUTO_INCREMENT PRIMARY KEY,
-          name VARCHAR(100) NOT NULL,
-          email VARCHAR(100) NOT NULL,
-          phone VARCHAR(20),
-          message TEXT NOT NULL,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )`,
-        
-        `CREATE TABLE IF NOT EXISTS gallery (
-          id INT AUTO_INCREMENT PRIMARY KEY,
-          title VARCHAR(255) NOT NULL,
-          description TEXT,
-          image_url VARCHAR(255) NOT NULL,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )`,
-        
-        `CREATE TABLE IF NOT EXISTS coupon_usage (
-          id INT AUTO_INCREMENT PRIMARY KEY,
-          coupon_id INT NOT NULL,
-          order_id INT NOT NULL,
-          user_email VARCHAR(100),
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          FOREIGN KEY (coupon_id) REFERENCES coupons(id),
-          FOREIGN KEY (order_id) REFERENCES orders(id)
-        )`
-      ];
-
-      console.log(`📊 Creating ${createTableStatements.length} tables...`);
-      let successCount = 0;
-
-      for (const stmt of createTableStatements) {
-        try {
-          await pool.query(stmt);
-          successCount++;
-          const tableName = stmt.match(/CREATE TABLE IF NOT EXISTS (\w+)/i)?.[1] || 'unknown';
-          console.log(`✅ Created table: ${tableName}`);
-        } catch (e) {
-          if (e.message.includes('already exists')) {
-            const tableName = stmt.match(/CREATE TABLE IF NOT EXISTS (\w+)/i)?.[1] || 'unknown';
-            console.log(`⏭️  Table already exists: ${tableName}`);
-          } else {
-            console.error('❌ Table creation error:', e.message.substring(0, 80));
-          }
-        }
-      }
-      
-      console.log(`✅ Database schema initialized (${successCount}/${createTableStatements.length} tables)`);
+      console.log('⚠️  No tables found. Run npm run setup-db to create the PostgreSQL schema.');
     } else {
       console.log('✅ Database tables already exist');
     }
-
-    // Run migrations
-    await ensureTrackingColumns();
-    await migrateCoupons();
-    await addCouponDiscountColumns();
-    await pool.query('ALTER TABLE products MODIFY image LONGTEXT NULL');
 
     return true;
   } catch (error) {
@@ -253,10 +130,11 @@ app.listen(PORT, async () => {
 
   if (result.success) {
     await initializeDatabase();
-    console.log('✅ Connected to MySQL');
+    console.log('✅ Connected to PostgreSQL');
     console.log('✅ Order tracking columns are ready');
     console.log('✅ Coupon tables are ready');
     console.log('✅ Coupon discount columns are ready');
+    console.log('✅ Gallery media columns are ready');
   } else {
     console.error('');
     console.error('❌ DATABASE CONNECTION FAILED');

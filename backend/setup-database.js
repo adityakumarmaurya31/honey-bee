@@ -12,11 +12,11 @@ async function setupDatabase() {
   try {
     // Test connection
     await pool.query('SELECT 1');
-    console.log('✅ Connected to MySQL server');
+    console.log('✅ Connected to PostgreSQL server');
   } catch (err) {
     console.error('❌ Cannot connect to MySQL server');
     console.error('   Error:', err.message);
-    console.error('   Make sure DB_HOST, DB_USER, DB_PASSWORD are correct in .env');
+    console.error('   Make sure the PostgreSQL connection values are correct in .env');
     process.exit(1);
   }
 
@@ -29,11 +29,13 @@ async function setupDatabase() {
 
   const schemaSQL = fs.readFileSync(schemaPath, 'utf8');
 
-  // Split and execute statements
+  // Remove comments before splitting so comments do not hide the SQL that follows them.
   const statements = schemaSQL
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^\s*--.*$/gm, '')
     .split(';')
     .map(s => s.trim())
-    .filter(s => s.length > 0 && !s.startsWith('--') && !s.startsWith('/*'));
+    .filter(Boolean);
 
   console.log(`📋 Found ${statements.length} SQL statements to execute\n`);
 
