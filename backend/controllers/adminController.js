@@ -100,7 +100,8 @@ const normalizeTrackingNumber = (value) => {
 
 const login = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const email = typeof req.body.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+    const password = typeof req.body.password === 'string' ? req.body.password : '';
     console.log('[LOGIN] Attempt for email:', email);
     console.log('[LOGIN] Request body:', { email, password: password ? 'provided' : 'missing' });
     
@@ -113,7 +114,7 @@ const login = async (req, res) => {
       // Only allow users with 'admin' role to login
       console.log('[LOGIN] Querying for admin user with email:', email);
       const [rows] = await pool.query(
-        'SELECT id, name, email, password, role FROM users WHERE email = ? AND role = ?',
+        'SELECT id, name, email, password, role FROM users WHERE LOWER(email) = ? AND role = ?',
         [email, 'admin']
       );
 
@@ -150,10 +151,9 @@ const login = async (req, res) => {
       console.log('[LOGIN] Token generated successfully for:', adminUser.email);
       res.json({ token, user: { id: adminUser.id, name: adminUser.name, email: adminUser.email } });
     } catch (dbError) {
-      // If database fails, reject login
       console.error('[LOGIN] Database error:', dbError.message);
       console.error('[LOGIN] Database error stack:', dbError.stack);
-      return res.status(401).json({ message: 'Invalid credentials' });
+      return res.status(503).json({ message: getDatabaseErrorMessage(dbError) });
     }
   } catch (error) {
     console.error('[LOGIN] Unexpected error:', error);
@@ -526,7 +526,7 @@ const updateOrderStatus = async (req, res) => {
 
     if (normalizedTrackingNumber) {
       const [existingOrders] = await pool.query(
-        'SELECT id FROM orders WHERE trackingNumber = ? AND id <> ? LIMIT 1',
+        'SELECT id FROM orders WHERE trackingnumber = ? AND id <> ? LIMIT 1',
         [normalizedTrackingNumber, id]
       );
 
@@ -538,11 +538,11 @@ const updateOrderStatus = async (req, res) => {
     const [updateResult] = await pool.query(
       `UPDATE orders
        SET status = ?,
-           trackingNumber = ?,
-           trackingAssignedAt = CASE
+           trackingnumber = ?,
+           trackingassignedat = CASE
              WHEN ? IS NULL THEN NULL
-             WHEN trackingNumber <> ? OR trackingAssignedAt IS NULL THEN CURRENT_TIMESTAMP
-             ELSE trackingAssignedAt
+             WHEN trackingnumber <> ? OR trackingassignedat IS NULL THEN CURRENT_TIMESTAMP
+             ELSE trackingassignedat
            END
        WHERE id = ?`,
       [status, normalizedTrackingNumber, normalizedTrackingNumber, normalizedTrackingNumber, id]
