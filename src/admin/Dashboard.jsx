@@ -294,9 +294,10 @@ const Dashboard = () => {
                     <div key={order.id} className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                         <div>
-                          <p className="text-sm uppercase tracking-[0.2em] text-slate-500">Order #{order.id}</p>
+                          <p className="text-sm uppercase tracking-[0.2em] text-slate-500">Order #{order.orderNumber || order.id}</p>
                           <p className="text-lg font-semibold text-slate-900">{order.user_name}</p>
                           <p className="text-sm text-slate-500">{order.user_email}</p>
+                          <p className="text-sm text-slate-500">Quantity: {order.quantity || 0}</p>
                         </div>
                         <div className="space-x-2 text-sm">
                           <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">{order.status}</span>

@@ -110,8 +110,9 @@ const Orders = () => {
           <div key={order.id} className="rounded-3xl bg-white p-6 shadow-sm border border-slate-200">
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div>
-                <p className="text-sm uppercase tracking-[0.2em] text-slate-500">Order #{order.id}</p>
+                <p className="text-sm uppercase tracking-[0.2em] text-slate-500">Order #{order.orderNumber || order.id}</p>
                 <p className="mt-2 text-lg font-semibold text-slate-900">{order.user_name} ({order.user_email})</p>
+                <p className="text-sm text-slate-500">Quantity: {order.quantity || 0}</p>
                 <p className="text-sm text-slate-500">Total: ₹{Number(order.total).toFixed(2)}</p>
                 <p className="text-sm text-slate-500">Payment: {order.paymentMethod}</p>
               </div>

@@ -163,10 +163,10 @@ const login = async (req, res) => {
 
 const dashboardStats = async (req, res) => {
   try {
-    const [[{ totalProducts }]] = await pool.query('SELECT COUNT(*) AS totalProducts FROM products');
-    const [[{ totalOrders }]] = await pool.query('SELECT COUNT(*) AS totalOrders FROM orders');
-    const [[{ totalUsers }]] = await pool.query('SELECT COUNT(*) AS totalUsers FROM users');
-    const [[{ totalRevenue }]] = await pool.query('SELECT IFNULL(SUM(total), 0) AS totalRevenue FROM orders');
+    const [[{ totalProducts }]] = await pool.query('SELECT COUNT(*) AS "totalProducts" FROM products');
+    const [[{ totalOrders }]] = await pool.query('SELECT COUNT(*) AS "totalOrders" FROM orders');
+    const [[{ totalUsers }]] = await pool.query('SELECT COUNT(*) AS "totalUsers" FROM users');
+    const [[{ totalRevenue }]] = await pool.query('SELECT COALESCE(SUM(total), 0) AS "totalRevenue" FROM orders');
 
     res.json({
       totalProducts: Number(totalProducts) || 0,
@@ -590,7 +590,9 @@ const deleteUser = async (req, res) => {
 const getOrders = async (req, res) => {
   try {
     const [orders] = await pool.query(
-            `SELECT o.id, o.user_id, u.name AS user_name, u.email AS user_email, o.status, o.total, o.paymentmethod,
+            `SELECT o.id, o.id AS "orderNumber", o.user_id, u.name AS user_name, u.email AS user_email, o.status, o.total,
+              (SELECT COALESCE(SUM(oi.quantity), 0) FROM order_items oi WHERE oi.order_id = o.id) AS quantity,
+              o.paymentmethod,
               o.trackingnumber, o.trackingassignedat, o.created_at, o.coupon_discount
        FROM orders o
        JOIN users u ON o.user_id = u.id
