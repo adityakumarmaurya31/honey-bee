@@ -26,7 +26,17 @@ function Navbar({ cartCount = 0 }) {
           Cart
           {cartCount > 0 && <span className="cart-count-badge">{cartCount}</span>}
         </NavLink>
-        <NavLink to="/admin/login" style={{ color: '#ff6b00', fontWeight: 'bold' }}>Admin</NavLink>
+        <details className="account-menu">
+          <summary>Account</summary>
+          <div className="account-menu-options">
+            <NavLink to="/" onClick={(event) => event.currentTarget.closest('details')?.removeAttribute('open')}>
+              User
+            </NavLink>
+            <NavLink to="/admin/login" onClick={(event) => event.currentTarget.closest('details')?.removeAttribute('open')}>
+              Admin
+            </NavLink>
+          </div>
+        </details>
       </nav>
     </header>
   );
