@@ -1,6 +1,16 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { API_BASE, getAuthHeaders, handleAuthError } from './api.js';
+import { API_BASE, getAuthHeaders, handleAuthError, resolveMediaUrl } from './api.js';
+
+const galleryFallbacks = [
+  '/ilr_IMG20260214112336.jpg',
+  '/ilr_IMG20260214112443.jpg',
+  '/ilr_IMG20260214112501_01.jpg',
+  '/ilr_IMG20260214112502_01.jpg',
+  '/ilr_IMG20260214112538_01.jpg',
+];
+
+const getGalleryFallback = (id) => galleryFallbacks[Number(id || 0) % galleryFallbacks.length];
 
 const Gallery = () => {
   const navigate = useNavigate();
@@ -243,13 +253,16 @@ const Gallery = () => {
                 <div className="relative h-48 bg-slate-200 overflow-hidden">
                   {item.media_type === 'image' ? (
                     <img
-                      src={item.media_url}
+                      src={resolveMediaUrl(item.media_url)}
                       alt={item.title}
+                      onError={(event) => {
+                        event.currentTarget.src = getGalleryFallback(item.id);
+                      }}
                       className="w-full h-full object-cover"
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center bg-slate-900">
-                      <video src={item.media_url} className="max-h-full" />
+                      <video src={resolveMediaUrl(item.media_url)} className="max-h-full" />
                       <div className="absolute inset-0 flex items-center justify-center bg-black/40">
                         <div className="text-white text-lg">▶</div>
                       </div>

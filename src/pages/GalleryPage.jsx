@@ -1,5 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { API_BASE } from '../admin/api.js';
+import { API_BASE, resolveMediaUrl } from '../admin/api.js';
+
+const galleryFallbacks = [
+  '/ilr_IMG20260214112336.jpg',
+  '/ilr_IMG20260214112443.jpg',
+  '/ilr_IMG20260214112501_01.jpg',
+  '/ilr_IMG20260214112502_01.jpg',
+  '/ilr_IMG20260214112538_01.jpg',
+];
+
+const getGalleryFallback = (id) => galleryFallbacks[Number(id || 0) % galleryFallbacks.length];
 
 function GalleryPage() {
   const [items, setItems] = useState([]);
@@ -71,14 +81,20 @@ function GalleryPage() {
                 <div className="relative overflow-hidden h-full bg-slate-200">
                   {item.media_type === 'image' ? (
                     <img
-                      src={item.media_url}
+                      src={resolveMediaUrl(item.media_url)}
                       alt={item.title}
+                      onError={(event) => {
+                        const fallback = getGalleryFallback(item.id);
+                        if (event.currentTarget.src !== `${window.location.origin}${fallback}`) {
+                          event.currentTarget.src = fallback;
+                        }
+                      }}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center bg-slate-900">
                       <video
-                        src={item.media_url}
+                        src={resolveMediaUrl(item.media_url)}
                         className="max-h-full max-w-full"
                         onMouseOver={(e) => e.target.play()}
                         onMouseOut={(e) => e.target.pause()}
@@ -117,13 +133,16 @@ function GalleryPage() {
             <div className="flex-1 overflow-auto flex items-center justify-center bg-slate-100 min-h-96">
               {selectedItem.media_type === 'image' ? (
                 <img
-                  src={selectedItem.media_url}
+                  src={resolveMediaUrl(selectedItem.media_url)}
                   alt={selectedItem.title}
+                  onError={(event) => {
+                    event.currentTarget.src = getGalleryFallback(selectedItem.id);
+                  }}
                   className="max-w-full max-h-full object-contain"
                 />
               ) : (
                 <video
-                  src={selectedItem.media_url}
+                  src={resolveMediaUrl(selectedItem.media_url)}
                   controls
                   autoPlay
                   className="max-w-full max-h-full"
