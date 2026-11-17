@@ -1,7 +1,7 @@
 const pool = require('../db.js');
 const sharp = require('sharp');
+const fs = require('fs');
 const path = require('path');
-const fs = require('fs').promises;
 const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
 
 // Configure S3 client if environment variables are present
@@ -33,6 +33,24 @@ const uploadBufferToS3 = async (buffer, originalName, mimeType, folder = 'galler
   return `https://${bucket}.s3.${region}.amazonaws.com/${key}`;
 };
 
+const bufferToDataUrl = (buffer, mimeType) => `data:${mimeType};base64,${buffer.toString('base64')}`;
+
+const ensureUploadsDir = (subfolder = 'gallery') => {
+  const uploadsDir = path.join(__dirname, '..', 'uploads', subfolder);
+  if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+  return uploadsDir;
+};
+
+const writeBufferToUploads = async (buffer, originalName, subfolder = 'gallery') => {
+  const uploadsDir = ensureUploadsDir(subfolder);
+  const sanitized = originalName.replace(/[^a-zA-Z0-9.-]/g, '_');
+  const filename = `${Date.now()}-${sanitized}`;
+  const filePath = path.join(uploadsDir, filename);
+  await fs.promises.writeFile(filePath, buffer);
+  // return web path used by static server mounted at /uploads
+  return `/uploads/${subfolder}/${filename}`;
+};
+
 const getGallery = async (req, res) => {
   try {
     res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
@@ -43,12 +61,24 @@ const getGallery = async (req, res) => {
       'SELECT * FROM gallery ORDER BY created_at DESC'
     );
 
-    const result = items.map((item) => ({
-      ...item,
-      media_url: item.media_url && item.media_url.startsWith('/uploads') 
-        ? `${req.protocol}://${req.get('host')}${item.media_url}`
-        : item.media_url,
-    }));
+    const forwardedProto = req.headers['x-forwarded-proto']?.split(',')[0]?.trim();
+    const forwardedHost = req.headers['x-forwarded-host']?.split(',')[0]?.trim();
+    const protocol = forwardedProto || req.protocol;
+    const host = forwardedHost || req.get('host');
+    const baseUrl = process.env.PUBLIC_API_BASE_URL || (host ? `${protocol}://${host}` : '');
+
+    const result = items.map((item) => {
+      const normalizedMediaUrl = typeof item.media_url === 'string'
+        ? item.media_url.replace(/\\/g, '/')
+        : item.media_url;
+
+      return {
+        ...item,
+        media_url: normalizedMediaUrl && normalizedMediaUrl.startsWith('/uploads')
+          ? (baseUrl ? `${baseUrl}${normalizedMediaUrl}` : normalizedMediaUrl)
+          : normalizedMediaUrl,
+      };
+    });
 
     res.json(result);
   } catch (error) {
@@ -86,12 +116,8 @@ const createGalleryItem = async (req, res) => {
             return res.status(500).json({ message: 'Failed to upload image to S3' });
           }
         } else {
-          const uploadsDir = path.join(__dirname, '..', 'uploads');
-          await fs.mkdir(uploadsDir, { recursive: true });
-          const passportFilename = `passport-${Date.now()}-${req.file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
-          const outPath = path.join(uploadsDir, passportFilename);
-          await fs.writeFile(outPath, resizedBuffer);
-          media_url = `/uploads/${passportFilename}`;
+          // No-S3 mode: force data URL for images so rendering does not depend on /uploads storage.
+          media_url = bufferToDataUrl(resizedBuffer, req.file.mimetype);
         }
       } catch (resizeError) {
         console.error('Image resize error:', resizeError);
@@ -107,12 +133,13 @@ const createGalleryItem = async (req, res) => {
           return res.status(500).json({ message: 'Failed to upload media to S3' });
         }
       } else {
-        const uploadsDir = path.join(__dirname, '..', 'uploads');
-        await fs.mkdir(uploadsDir, { recursive: true });
-        const filename = `${Date.now()}-${req.file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
-        const outPath = path.join(uploadsDir, filename);
-        await fs.writeFile(outPath, req.file.buffer);
-        media_url = `/uploads/${filename}`;
+        // Persist video to local uploads (beware of large files)
+        try {
+          media_url = await writeBufferToUploads(req.file.buffer, req.file.originalname, 'gallery');
+        } catch (e) {
+          console.error('Write video to uploads failed, falling back to data URL:', e);
+          media_url = bufferToDataUrl(req.file.buffer, req.file.mimetype);
+        }
       }
     }
 
@@ -125,7 +152,7 @@ const createGalleryItem = async (req, res) => {
       id: result.insertId,
       title,
       description,
-      media_url: media_url && media_url.startsWith('/uploads') ? `${req.protocol}://${req.get('host')}${media_url}` : media_url,
+      media_url,
       media_type,
       message: 'Gallery item added successfully'
     });
