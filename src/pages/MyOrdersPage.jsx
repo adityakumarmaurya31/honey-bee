@@ -194,12 +194,20 @@ function MyOrdersPage() {
                 )}
               </div>
             </div>
+            {compact && order.status === 'Delivered' && (
+              <Link
+                to={`/invoice/${order.id}${order.trackingNumber ? `?trackingNumber=${encodeURIComponent(order.trackingNumber)}` : ''}`}
+                className="inline-flex rounded-2xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+              >
+                View Invoice
+              </Link>
+            )}
             {!compact && (
               <div className="flex gap-2 flex-wrap">
                 {order.status === 'Delivered' && (
                   <>
                     <Link
-                      to={`/invoice/${order.id}`}
+                      to={`/invoice/${order.id}${order.trackingNumber ? `?trackingNumber=${encodeURIComponent(order.trackingNumber)}` : ''}`}
                       className="rounded-2xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
                     >
                       View Invoice

@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { API_BASE } from '../admin/api.js';
 
 const UserInvoice = () => {
   const { orderId } = useParams();
+  const [searchParams] = useSearchParams();
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
@@ -54,11 +55,11 @@ const UserInvoice = () => {
       setMessage('');
 
       try {
-        // Get email from localStorage or URL params
+        const trackingNumber = searchParams.get('trackingNumber');
         const userEmail = localStorage.getItem('userEmail');
         console.log('📧 UserInvoice - Email from localStorage:', userEmail);
         
-        if (!userEmail) {
+        if (!userEmail && !trackingNumber) {
           setMessage('Please provide your email to view invoices');
           setLoading(false);
           return;
@@ -71,9 +72,10 @@ const UserInvoice = () => {
           return;
         }
 
-        console.log('🔄 UserInvoice - Fetching orders for email:', userEmail);
-        // Fetch all user orders
-        const response = await fetch(`${API_BASE}/api/orders/user?email=${encodeURIComponent(userEmail)}`);
+        const endpoint = trackingNumber
+          ? `${API_BASE}/api/orders/track?trackingNumber=${encodeURIComponent(trackingNumber)}`
+          : `${API_BASE}/api/orders/user?email=${encodeURIComponent(userEmail)}`;
+        const response = await fetch(endpoint);
         console.log('📡 UserInvoice - API Response status:', response.status);
         
         const data = await response.json();
@@ -89,7 +91,7 @@ const UserInvoice = () => {
         const orderIdInt = parseInt(orderId);
         console.log('🔎 UserInvoice - Looking for order ID:', orderIdInt, 'from orders:', data.map(o => o.id));
         
-        const foundOrder = data.find(o => o.id === orderIdInt);
+        const foundOrder = trackingNumber ? data : data.find(o => o.id === orderIdInt);
         console.log('✅ UserInvoice - Found order:', foundOrder);
         
         if (!foundOrder) {

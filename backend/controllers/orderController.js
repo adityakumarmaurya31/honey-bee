@@ -414,7 +414,11 @@ const getOrderItemsForOrder = async (req, orderId) => {
 
   return items.map((item) => ({
     ...item,
-    product_image: item.product_image ? `${req.protocol}://${req.get('host')}${item.product_image}` : null,
+    product_image: item.product_image?.startsWith('data:')
+      ? item.product_image
+      : item.product_image?.startsWith('/uploads')
+        ? `${req.protocol}://${req.get('host')}${item.product_image}`
+        : item.product_image,
   }));
 };
 
