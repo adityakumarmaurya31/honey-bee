@@ -87,11 +87,12 @@ const UserInvoice = () => {
           return;
         }
 
-        // Find the specific order
-        const orderIdInt = parseInt(orderId);
-        console.log('🔎 UserInvoice - Looking for order ID:', orderIdInt, 'from orders:', data.map(o => o.id));
-        
-        const foundOrder = trackingNumber ? data : data.find(o => o.id === orderIdInt);
+        // The user endpoint returns an array, while tracking returns one order object.
+        const orders = Array.isArray(data) ? data : [data];
+        const orderIdInt = parseInt(orderId, 10);
+        console.log('🔎 UserInvoice - Looking for order ID:', orderIdInt, 'from', orders.length, 'order response(s)');
+
+        const foundOrder = orders.find((item) => Number(item.id) === orderIdInt);
         console.log('✅ UserInvoice - Found order:', foundOrder);
         
         if (!foundOrder) {
@@ -163,13 +164,14 @@ const UserInvoice = () => {
   // Debug: Log order data
   console.log('Invoice page - Order data:', { order, hasItems: order?.items?.length, couponDiscount: order?.coupon_discount });
 
-  const subtotal = order.items.reduce((sum, item) => sum + Number(item.price) * Number(item.quantity), 0);
+  const invoiceItems = Array.isArray(order.items) ? order.items : [];
+  const subtotal = invoiceItems.reduce((sum, item) => sum + Number(item.price) * Number(item.quantity), 0);
   const couponDiscount = Number(order.coupon_discount) || 0;
   
   // Calculate original MRP and discount
   let originalMRP = 0;
   let totalDiscount = 0;
-  order.items.forEach((item) => {
+  invoiceItems.forEach((item) => {
     const itemPrice = Number(item.price);
     const itemDiscount = Number(item.discount) || 0;
     const itemQuantity = Number(item.quantity);
@@ -260,8 +262,8 @@ const UserInvoice = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {order.items && order.items.length > 0 ? (
-                    order.items.map((item) => {
+                  {invoiceItems.length > 0 ? (
+                    invoiceItems.map((item) => {
                       const itemPrice = Number(item.price);
                       const itemQuantity = Number(item.quantity);
                       const discountPercent = Number(item.discount) || 0;
